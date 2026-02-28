@@ -1,0 +1,15 @@
+# ====================================================
+#  바른모양 마케팅 OS - 설정 파일
+#  메모장(Notepad)으로 수정하신 후 앱을 재시작하세요.
+# ====================================================
+
+# Gemini API 키 (Google AI Studio에서 발급)
+GEMINI_API_KEY=AIzaSyB9jCjflgFqzZBbmj1nTWnPiJ7UdkeVjwU
+
+# 로그인 계정 정보
+LOGIN_ID=seoyon
+LOGIN_PASSWORD=qwer
+
+# 이메일 (알림용, 변경 불필요)
+GMAIL_USER=itsarainyday88@gmail.com
+GMAIL_APP_PASSWORD=qyxs zedj mzmt rbkt
