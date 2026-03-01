@@ -36,7 +36,7 @@ export async function POST(req: Request) {
                     if (fullResponseBuffer.trim().length > 50) {
                         try {
                             const { error: dbError } = await supabase
-                                .from('archive_posts')
+                                .from('documents')
                                 .insert([{
                                     agent_id: String(agentId),
                                     content: fullResponseBuffer,
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
                             if (dbError) {
                                 console.error('[Cloud Sync] Database Insert Error:', dbError.message);
                             } else {
-                                console.log('[Cloud Sync] Successfully saved to archive_posts');
+                                console.log('[Cloud Sync] Successfully saved to documents');
                             }
                         } catch (dbErr) {
                             console.error('[Cloud Sync] Exception during Supabase save:', dbErr);

@@ -75,7 +75,7 @@ export default function ArchiveView() {
         try {
             setLoading(true);
             const { data, error } = await supabase
-                .from('archive_posts')
+                .from('documents')
                 .select('*')
                 .order('created_at', { ascending: false });
 
@@ -93,7 +93,7 @@ export default function ArchiveView() {
         if (!confirm('문서를 영구 삭제하시겠습니까?')) return;
 
         try {
-            const { error } = await supabase.from('archive_posts').delete().eq('id', id);
+            const { error } = await supabase.from('documents').delete().eq('id', id);
             if (error) throw error;
             if (selectedDoc?.id === id) setSelectedDoc(null);
             fetchDocuments();
