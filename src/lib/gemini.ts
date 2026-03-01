@@ -5,6 +5,7 @@ import { toolDefinitions, thinkingToolDefinitions, memoryToolDefinitions, search
 import { memoryTools } from './tools/memoryHelpers';
 import { thinkingTools } from './tools/thinkingHelpers';
 import { searchTools } from './tools/searchHelpers';
+import { retrieveStyleContext } from './rag';
 
 const apiKey = process.env.GEMINI_API_KEY!;
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -13,13 +14,30 @@ const genAI = new GoogleGenerativeAI(apiKey);
  * 이미지 생성 실패 시, 프롬프트 맥락에 맞는 실제 보유 이미지 경로 반환
  * public/images 폴더 내 실사 사진들을 상황별로 자동 선택
  */
+// Keep track of recent fallback images to avoid consecutive duplicates
+let lastFallbackImage = '';
+
 /** 이미지 생성 실패 시 카테고리별 후보 풀에서 랜덤 선택하여 반환. 같은 글에서도 다양한 사진이 나옴. */
 function getFallbackImage(promptText: string): string {
     const p = promptText.toLowerCase();
-    const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+    // Helper function to pick a random item, avoiding the last used one if possible
+    const pick = (arr: string[]) => {
+        if (arr.length <= 1) return arr[0];
+
+        let candidate = arr[Math.floor(Math.random() * arr.length)];
+        let attempts = 0;
+        // Try up to 3 times to get a different image than the last one
+        while (candidate === lastFallbackImage && attempts < 3) {
+            candidate = arr[Math.floor(Math.random() * arr.length)];
+            attempts++;
+        }
+        lastFallbackImage = candidate;
+        return candidate;
+    };
 
     // 로고: 명시적으로 logo를 요청할 때만
-    if (p.includes('logo')) return '/images/logo.png';
+    if (p.includes('logo')) return pick(['/images/logo.png']);
 
     // 지도/위치
     if (p.includes('map') || p.includes('location') || p.includes('direction') || p.includes('위치') || p.includes('지도') || p.includes('길찾기')) {
@@ -28,12 +46,12 @@ function getFallbackImage(promptText: string): string {
 
     // 원장/강사/전문성
     if (p.includes('director') || p.includes('teacher') || p.includes('instructor') || p.includes('원장') || p.includes('강사') || p.includes('expert') || p.includes('professional')) {
-        return pick(['/images/directors.png', '/images/lecture_room.jpg']);
+        return pick(['/images/directors.png', '/images/lecture_room.jpg', '/images/consulting_room.jpg']);
     }
 
-    // 자습/스터디
-    if (p.includes('study') || p.includes('student') || p.includes('self') || p.includes('자습') || p.includes('스터디') || p.includes('premium')) {
-        return pick(['/images/Premium.jpg', '/images/lecture_room.jpg']);
+    // 자습/스터디/교실
+    if (p.includes('study') || p.includes('student') || p.includes('self') || p.includes('자습') || p.includes('스터디') || p.includes('premium') || p.includes('class')) {
+        return pick(['/images/Premium.jpg', '/images/lecture_room.jpg', '/images/interior_1.jpg']);
     }
 
     // 외관/건물
@@ -42,7 +60,16 @@ function getFallbackImage(promptText: string): string {
     }
 
     // 기본: 전체 풀에서 랜덤 순환 (map 제외)
-    return pick(['/images/lecture_room.jpg', '/images/Premium.jpg', '/images/directors.png', '/images/exterior.jpg', '/images/logo.png']);
+    return pick([
+        '/images/lecture_room.jpg',
+        '/images/Premium.jpg',
+        '/images/directors.png',
+        '/images/exterior.jpg',
+        '/images/logo.png',
+        '/images/interior_1.jpg',
+        '/images/interior_2.jpg',
+        '/images/consulting_room.jpg'
+    ]);
 }
 
 // Export as a streaming generator
@@ -87,9 +114,19 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             console.log('[Tool] Marketer: Deep Research tools (search_local_trends, scrape_website) enabled.');
         }
 
+        // Fetch RAG context automatically (except for strict Marketer research maybe, but let's apply to all or specific writing agents)
+        // For writing tasks ('Blog', 'Insta', 'Dang', 'Reputation', 'Supporter'), inject style context
+        let systemInstruction = getSystemInstruction(agentId, message);
+        if (['Blog', 'Insta', 'Dang', 'Reputation', 'Supporter'].includes(agentId)) {
+            const styleContext = await retrieveStyleContext(message);
+            if (styleContext) {
+                systemInstruction += styleContext;
+            }
+        }
+
         const model = genAI.getGenerativeModel({
             model: modelName,
-            systemInstruction: getSystemInstruction(agentId, message),
+            systemInstruction: systemInstruction,
             tools: tools as any,
             generationConfig: {
                 temperature: 1.0,

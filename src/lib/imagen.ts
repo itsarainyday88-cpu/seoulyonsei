@@ -27,13 +27,25 @@ export async function generateAndSaveImage(prompt: string): Promise<string | nul
 
     async function callImagenApi(promptToUse: string, modelName: string): Promise<string | null> {
         // [Logic Branch]
-        // In AI Studio (v1beta), both Gemini Image and Imagen 4 models use `generateContent`
-        const method = 'generateContent';
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:${method}?key=${apiKey}`;
+        // In AI Studio, direct image generation models might need different URL structures depending on their type.
+        // Assuming gemini-* models use generateContent and imagen-* models use predict (standard vertex/studio behavior)
+        let url = '';
+        let requestBody: any = {};
 
-        const requestBody = {
-            contents: [{ parts: [{ text: promptToUse }] }],
-        };
+        if (modelName.startsWith('imagen')) {
+            // Standard Imagen API format (Often uses different endpoint or payload)
+            url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:predict?key=${apiKey}`;
+            requestBody = {
+                instances: [{ prompt: promptToUse }],
+                parameters: { sampleCount: 1, outputOptions: { mimeType: "image/png" } }
+            };
+        } else {
+            // Gemini format (e.g., gemini-3.1-flash-image-preview)
+            url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            requestBody = {
+                contents: [{ parts: [{ text: promptToUse }] }],
+            };
+        }
 
         try {
             const response = await fetch(url, {
@@ -50,7 +62,12 @@ export async function generateAndSaveImage(prompt: string): Promise<string | nul
 
             const data = await response.json();
 
-            // Extract Base64 from Gemini/Imagen response format
+            // 1. Check for Imagen standard response format
+            if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+                return data.predictions[0].bytesBase64Encoded;
+            }
+
+            // 2. Extract Base64 from Gemini/Imagen response format
             // Most recent models return inlineData inside candidates[0].content.parts
             const part = data.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
             if (part && part.inlineData && part.inlineData.data) {

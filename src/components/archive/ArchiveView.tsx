@@ -189,6 +189,10 @@ export default function ArchiveView() {
                 handoffType = 'HWACK_UPLOAD_INSTA';
                 const imageRegex = /!\[.*?\]\((.*?)\)/g;
                 let rawCaption = fullBody.replace(/!\[.*?\]\(.*?\)/g, '').replace(/Nano Banana Prompt:.*?\n/gi, '');
+                const complianceMatch = rawCaption.match(/\[🚦 Compliance Check\][\s\S]*/);
+                if (complianceMatch) {
+                    rawCaption = rawCaption.substring(0, complianceMatch.index);
+                }
                 const cleanCaption = stripMarkdown(rawCaption);
 
                 const blocks: any[] = [];
@@ -216,7 +220,6 @@ export default function ArchiveView() {
                     downloadCount++;
                 }
                 postData = { caption: cleanCaption, blocks };
-
             } else if (platform === 'Dang') {
                 handoffType = 'HWACK_UPLOAD_DANG';
                 const lines = fullBody.split('\n').map(l => l.trim()).filter(l => l.length > 0);

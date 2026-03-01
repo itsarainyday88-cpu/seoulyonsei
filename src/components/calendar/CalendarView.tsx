@@ -120,21 +120,21 @@ export default function CalendarView() {
 
     return (
         <div className="flex flex-col h-full bg-[#FAFAFA] text-foreground p-6 overflow-y-auto">
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-end mb-8 border-b border-gray-100 pb-6">
                 <div>
-                    <h2 className="text-2xl font-bold font-serif flex items-center gap-2">
-                        <CalendarIcon className="w-6 h-6 text-primary" /> 마케팅 캘린더
-                        <span className="ml-2 px-2 py-1 bg-green-100/80 text-green-700 text-[11px] rounded-lg font-bold flex items-center gap-1 shadow-sm border border-green-200">
-                            <Clock className="w-3 h-3" /> 매일 아침 9시 자동생성 ☁️ (Autopilot ON)
+                    <h2 className="text-2xl font-extrabold font-serif flex items-center gap-2 text-gray-800">
+                        <CalendarIcon className="w-6 h-6 text-[#71161A]" /> 마케팅 캘린더
+                        <span className="ml-1 px-2 py-0.5 bg-green-50 text-green-600 text-[10px] rounded-full font-bold flex items-center gap-1 border border-green-100 uppercase tracking-tighter">
+                            <Clock className="w-3 h-3" /> Autopilot ON (09:00)
                         </span>
                     </h2>
-                    <p className="text-sm text-gray-500 mt-1">월간 마케팅 발행 계획을 수립하세요. 예약된 일정은 <b>매일 아침 09:00</b> 클라우드 엔진에 의해 오프라인 상태에서도 자동 생성되어 보관함에 담깁니다.</p>
+                    <p className="text-sm text-gray-400 mt-1 font-medium italic">매일 아침 9시, 예약된 주제로 원고가 자동 생성됩니다.</p>
                 </div>
                 <button
                     onClick={() => setIsCreating(!isCreating)}
-                    className="bg-white text-[#71161A] border-2 border-[#71161A] px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[#71161A] hover:text-white transition-all shadow-sm"
+                    className="shrink-0 bg-white text-[#71161A] border-2 border-[#71161A] px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-[#71161A] hover:text-white transition-all shadow-md active:scale-95 ml-6"
                 >
-                    <PlusCircle className="w-4 h-4" /> 새 일정 추가
+                    <PlusCircle className="w-5 h-5" /> 새 일정 추가
                 </button>
             </div>
 

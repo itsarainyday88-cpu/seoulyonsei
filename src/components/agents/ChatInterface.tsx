@@ -539,7 +539,6 @@ export default function ChatInterface() {
 
                                                         // 1. Text Copy (Caption without image markers and without compliance check)
                                                         let rawCaption = fullContent.replace(/!\[.*?\]\(.*?\)/g, '').replace(/Nano Banana Prompt:.*?\n/gi, '');
-                                                        // 신호등 컴플라이언스 체크 영역 잘라내기
                                                         const complianceMatch = rawCaption.match(/\[🚦 Compliance Check\][\s\S]*/);
                                                         if (complianceMatch) {
                                                             rawCaption = rawCaption.substring(0, complianceMatch.index);
@@ -563,7 +562,6 @@ export default function ChatInterface() {
                                                             const url = match[1];
                                                             const fullUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url;
 
-                                                            // Find text between this image and the next image
                                                             let nextMatchStart = fullContent.length;
                                                             const lookaheadRegex = /!\[.*?\]\((.*?)\)/g;
                                                             lookaheadRegex.lastIndex = imageRegex.lastIndex;
@@ -614,7 +612,6 @@ export default function ChatInterface() {
                                                                 body: JSON.stringify({ type: 'HWACK_UPLOAD_INSTA', data: { caption: cleanCaption, blocks: blocks } })
                                                             });
                                                             const { id } = await res.json();
-                                                            // Electron URL Click 방식을 우회하여 메인 앱 상태를 유지하며 외부 브라우저로 띄움
                                                             if ((window as any).electronAPI) {
                                                                 (window as any).electronAPI.send('open-external', `${window.location.origin}/handoff?id=${id}`);
                                                             } else {
