@@ -4,50 +4,36 @@ import fs from 'fs';
 import path from 'path';
 import { supabase } from '@/lib/supabase';
 
+export const runtime = 'nodejs'; // Use nodejs runtime for fs and background tasks
+
 export async function POST(req: Request) {
+    let agentId = 'Blog';
     try {
         const body = await req.json();
-        const { agentId, message, history, useSearch }: any = body;
+        const { agentId: bodyAgentId, message, history, useSearch }: any = body;
+        agentId = bodyAgentId || 'Blog';
 
         if (!agentId || !message) {
             return NextResponse.json({ error: 'Missing activeAgent or message' }, { status: 400 });
         }
 
-        // --- Create a ReadableStream and return it immediately ---
         const stream = new ReadableStream({
             async start(controller) {
                 const encoder = new TextEncoder();
-                let fullResponseBuffer = ''; // Buffer to capture the main agent's output
+                let fullResponseBuffer = '';
 
                 try {
-                    // [Stage 1] Main Agent Generation
-                    // Generate chunks using our Gemini wrapper
                     const generator = generateAgentResponseStream(agentId, message, history, useSearch);
 
                     for await (const chunk of generator) {
                         const encoded = encoder.encode(chunk);
                         controller.enqueue(encoded);
-                        fullResponseBuffer += chunk; // Accumulate for review
+                        fullResponseBuffer += chunk;
                     }
 
-                    controller.close();
-
-                    // --- Auto-Save Logic (Local MD file) ---
+                    // --- Cloud Sync: Save to Supabase BEFORE closing ---
+                    // This ensures the serverless function stays alive until the save is awaited.
                     if (fullResponseBuffer.trim().length > 50) {
-                        try {
-                            const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                            const baseDir = process.env.APPDATA || process.env.USERPROFILE || process.cwd();
-                            const outDir = path.join(baseDir, 'SeoulYonsei_Data', 'outputs');
-                            if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-                            const fileName = `${agentId}_${dateStr}.md`;
-                            fs.writeFileSync(path.join(outDir, fileName), fullResponseBuffer, 'utf8');
-                            console.log(`[Auto-Save] Document saved to ${outDir}/${fileName}`);
-                        } catch (saveErr) {
-                            console.error('[Auto-Save] Error saving local document (expected in Vercel):', saveErr);
-                        }
-
-                        // --- Cloud Sync: Save to Supabase ---
-                        // Vercel 환경에서는 위 fs.writeFileSync 가 에러를 내므로, DB 저장을 분리합니다.
                         try {
                             const { error: dbError } = await supabase
                                 .from('archive_posts')
@@ -58,13 +44,27 @@ export async function POST(req: Request) {
                                 }]);
 
                             if (dbError) {
-                                console.error('[Cloud Sync] DB insert error (documents):', dbError);
+                                console.error('[Cloud Sync] Database Insert Error:', dbError.message);
                             } else {
-                                console.log(`[Cloud Sync] Document successfully synced to Supabase (agent: ${agentId})`);
+                                console.log('[Cloud Sync] Successfully saved to archive_posts');
                             }
-                        } catch (syncErr) {
-                            console.error('[Cloud Sync] Supabase sync unexpected error:', syncErr);
+                        } catch (dbErr) {
+                            console.error('[Cloud Sync] Exception during Supabase save:', dbErr);
                         }
+                    }
+
+                    controller.close();
+
+                    // --- Optional: Local File Save (Likely to fail on Vercel) ---
+                    if (fullResponseBuffer.trim().length > 50) {
+                        try {
+                            const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                            const baseDir = process.env.APPDATA || process.env.USERPROFILE || process.cwd();
+                            const outDir = path.join(baseDir, 'SeoulYonsei_Data', 'outputs');
+                            if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+                            const fileName = `${agentId}_${dateStr}.md`;
+                            fs.writeFileSync(path.join(outDir, fileName), fullResponseBuffer, 'utf8');
+                        } catch (_) { }
                     }
                 } catch (error: any) {
                     console.error('Streaming Error:', error);
@@ -82,12 +82,8 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error('------- CHAT API ERROR -------');
-        console.error('Agent ID:', (req as any).body?.agentId);
-        console.error('Error Name:', error.name);
+        console.error('Agent ID:', agentId);
         console.error('Error Message:', error.message);
-        console.error('Stack:', error.stack);
-        console.error('------------------------------');
-
         return NextResponse.json({
             error: `Server Error: ${error.message || 'Unknown error'}`
         }, { status: 500 });
