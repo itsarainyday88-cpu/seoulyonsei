@@ -90,6 +90,10 @@ export default function ChatInterface() {
                         }
                         resolve(canvas.toDataURL('image/jpeg', quality));
                     };
+                    img.onerror = () => {
+                        console.warn('[compressImage] Failed to load image. Falling back to uncompressed dataUrl.');
+                        resolve(dataUrl);
+                    };
                     img.src = dataUrl;
                 });
             };
