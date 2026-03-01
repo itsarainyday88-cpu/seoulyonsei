@@ -42,28 +42,28 @@ export async function POST(req: Request) {
                             const fileName = `${agentId}_${dateStr}.md`;
                             fs.writeFileSync(path.join(outDir, fileName), fullResponseBuffer, 'utf8');
                             console.log(`[Auto-Save] Document saved to ${outDir}/${fileName}`);
-
-                            // --- Cloud Sync: Save to Supabase ---
-                            try {
-                                const { error: dbError } = await supabase
-                                    .from('documents')
-                                    .insert([{
-                                        agent_id: String(agentId),
-                                        content: fullResponseBuffer,
-                                        created_at: new Date().toISOString()
-                                    }]);
-
-                                if (dbError) {
-                                    console.error('[Cloud Sync] DB insert error (documents):', dbError);
-                                } else {
-                                    console.log(`[Cloud Sync] Document successfully synced to Supabase (agent: ${agentId})`);
-                                }
-                            } catch (syncErr) {
-                                console.error('[Cloud Sync] Supabase sync unexpected error:', syncErr);
-                            }
-
                         } catch (saveErr) {
-                            console.error('[Auto-Save] Error saving document:', saveErr);
+                            console.error('[Auto-Save] Error saving local document (expected in Vercel):', saveErr);
+                        }
+
+                        // --- Cloud Sync: Save to Supabase ---
+                        // Vercel 환경에서는 위 fs.writeFileSync 가 에러를 내므로, DB 저장을 분리합니다.
+                        try {
+                            const { error: dbError } = await supabase
+                                .from('documents')
+                                .insert([{
+                                    agent_id: String(agentId),
+                                    content: fullResponseBuffer,
+                                    created_at: new Date().toISOString()
+                                }]);
+
+                            if (dbError) {
+                                console.error('[Cloud Sync] DB insert error (documents):', dbError);
+                            } else {
+                                console.log(`[Cloud Sync] Document successfully synced to Supabase (agent: ${agentId})`);
+                            }
+                        } catch (syncErr) {
+                            console.error('[Cloud Sync] Supabase sync unexpected error:', syncErr);
                         }
                     }
                 } catch (error: any) {
