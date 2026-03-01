@@ -50,7 +50,7 @@ export async function POST(req: Request) {
                         // Vercel 환경에서는 위 fs.writeFileSync 가 에러를 내므로, DB 저장을 분리합니다.
                         try {
                             const { error: dbError } = await supabase
-                                .from('documents')
+                                .from('archive_posts')
                                 .insert([{
                                     agent_id: String(agentId),
                                     content: fullResponseBuffer,
