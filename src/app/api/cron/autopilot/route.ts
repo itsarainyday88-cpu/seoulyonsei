@@ -5,9 +5,8 @@ import { generateAgentResponseStream } from '@/lib/gemini';
 // 이 API는 매일 00:00 UTC (KST 오전 9시 정각)에 Vercel Cron 인프라에 의해 자동 호출됩니다.
 export async function GET(request: Request) {
     // 1. 보안 인가 (Vercel Cron Secret 검증)
-    // 실제 Vercel 연동 시 환경변수 CRON_SECRET을 설정하여 외부의 악의적 호출을 막습니다.
     const authHeader = request.headers.get('authorization');
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized Access' }, { status: 401 });
     }
 
@@ -21,7 +20,7 @@ export async function GET(request: Request) {
             .from('calendar')
             .select('*')
             .eq('status', 'planned')
-            .lte('work_date', todayStr);
+            .filter('work_date', 'lte', todayStr);
 
         if (error) {
             console.error('[Autopilot] Database Query Error:', error);

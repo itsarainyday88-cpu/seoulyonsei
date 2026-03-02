@@ -46,12 +46,12 @@ function getFallbackImage(promptText: string): string {
 
     // 원장/강사/전문성
     if (p.includes('director') || p.includes('teacher') || p.includes('instructor') || p.includes('원장') || p.includes('강사') || p.includes('expert') || p.includes('professional')) {
-        return pick(['/images/directors.png', '/images/lecture_room.jpg']);
+        return pick(['/images/directors.png', '/images/lecture_room.jpg', '/images/consulting_room.jpg']);
     }
 
     // 자습/스터디/교실
     if (p.includes('study') || p.includes('student') || p.includes('self') || p.includes('자습') || p.includes('스터디') || p.includes('premium') || p.includes('class')) {
-        return pick(['/images/Premium.jpg', '/images/lecture_room.jpg']);
+        return pick(['/images/Premium.jpg', '/images/lecture_room.jpg', '/images/interior_1.jpg']);
     }
 
     // 외관/건물
@@ -65,7 +65,10 @@ function getFallbackImage(promptText: string): string {
         '/images/Premium.jpg',
         '/images/directors.png',
         '/images/exterior.jpg',
-        '/images/logo.png'
+        '/images/logo.png',
+        '/images/interior_1.jpg',
+        '/images/interior_2.jpg',
+        '/images/consulting_room.jpg'
     ]);
 }
 
@@ -227,13 +230,12 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                 } catch (err) {
                                     // 오류 시도 폴백 이미지 사용
                                     const fallback = getFallbackImage(promptText);
-                                    const fallbackLine = line.replace(fullMatch, `\n\n![학원 이미지](${fallback})\n\n`);
-                                    yield fallbackLine + '\n';
+                                    yield `\n\n![학원 이미지](${fallback})\n\n`;
                                 }
                             } else {
                                 // Empty prompt
                                 console.warn('[Gemini] Empty prompt detected:', line);
-                                yield line.replace(fullMatch, '') + '\n';
+                                yield '';
                             }
                         } else {
                             yield line + '\n';

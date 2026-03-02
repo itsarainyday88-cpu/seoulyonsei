@@ -133,10 +133,6 @@ export default function ArchiveView() {
                         if (ctx) ctx.drawImage(img, 0, 0, width, height);
                         resolve(canvas.toDataURL('image/jpeg', quality));
                     };
-                    img.onerror = () => {
-                        console.warn('[ArchiveView compressImage] Failed to load image. Falling back to uncompressed dataUrl.');
-                        resolve(dataUrl);
-                    };
                     img.src = dataUrl;
                 });
             };

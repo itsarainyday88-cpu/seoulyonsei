@@ -3,6 +3,10 @@
         {
             "path": "/api/cron/autopilot",
             "schedule": "0 0 * * *"
+        },
+        {
+            "path": "/api/cron/keep_alive",
+            "schedule": "0 0 */3 * *"
         }
     ]
 }
