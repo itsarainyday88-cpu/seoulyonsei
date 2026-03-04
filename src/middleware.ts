@@ -14,6 +14,8 @@ export async function middleware(request: NextRequest) {
         path === '/login' ||
         path === '/register' ||
         path === '/forgot-password' ||
+        path === '/handoff' || // Allow extension handoff bridge
+        path.startsWith('/api/handoff') || // Allow handoff API access
         path.startsWith('/api/auth') || // Allow all auth APIs
         path.startsWith('/_next') ||
         path.startsWith('/static') ||

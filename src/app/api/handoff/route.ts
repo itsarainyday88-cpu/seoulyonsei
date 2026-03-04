@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { dataStore } from '@/lib/memory-store';
 import crypto from 'crypto';
 
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '10mb', // Support high-quality image transfers
+        },
+    },
+};
+
 export async function POST(request: Request) {
     try {
         const body = await request.json();

@@ -6,7 +6,7 @@ import crypto from 'crypto';
  * Generates an image using Gemini Imagen 3 (Nano Banana Pro) via REST API.
  * Saves the image to public/generated-images and returns the public URL.
  */
-export async function generateAndSaveImage(prompt: string): Promise<string | null> {
+export async function generateAndSaveImage(prompt: string, excludedPaths: string[] = []): Promise<string | null> {
     const apiKey = process.env.GEMINI_API_KEY || process.env.IMAGEN_API_KEY;
     if (!apiKey) {
         console.error('GEMINI_API_KEY is missing');
@@ -19,7 +19,7 @@ export async function generateAndSaveImage(prompt: string): Promise<string | nul
 
     // POLICY CHECK: Should we skip AI generation for real-world assets?
     const { getImagePolicy } = await import('@/lib/image-policy');
-    const policy = getImagePolicy(cleanPrompt);
+    const policy = getImagePolicy(cleanPrompt, excludedPaths);
     if (!policy.shouldGenerate) {
         console.log(`[Policy] Skipping AI generation. Reason: ${policy.reason}`);
         return policy.selectedImagePath || null;
@@ -93,31 +93,21 @@ export async function generateAndSaveImage(prompt: string): Promise<string | nul
     }
 
     try {
-        // Attempt 1: Nano Banana Pro (Gemini 3 Pro Image) - Real ID
-        let base64Data = await callImagenApi(finalPrompt, 'gemini-3-pro-image-preview');
+        // [UPDATE] Prioritize Imagen 4 and specialized latest models
+        const modelOrder = [
+            'imagen-4.0-ultra-generate-001',
+            'imagen-4.0-generate-001',
+            'imagen-4.0-fast-generate-001',
+            'gemini-3-pro-image-preview',
+            'gemini-3.1-flash-image-preview',
+            'gemini-2.5-flash-image'
+        ];
 
-        // Attempt 2: Nano Banana 2 (Gemini 3.1 Flash Image) - Real ID
-        if (!base64Data) {
-            console.log('[Imagen] Fallback to gemini-3.1-flash-image-preview...');
-            base64Data = await callImagenApi(finalPrompt, 'gemini-3.1-flash-image-preview');
-        }
-
-        // Attempt 3: Imagen 4.0 Generate (Standard)
-        if (!base64Data) {
-            console.log('[Imagen] Fallback to imagen-4.0-generate-001...');
-            base64Data = await callImagenApi(finalPrompt, 'imagen-4.0-generate-001');
-        }
-
-        // Attempt 4: Nano Banana (Gemini 2.5 Flash Image)
-        if (!base64Data) {
-            console.log('[Imagen] Fallback to gemini-2.5-flash-image...');
-            base64Data = await callImagenApi(finalPrompt, 'gemini-2.5-flash-image');
-        }
-
-        // Final Attempt: Imagen 3.0 (Old reliable fallback)
-        if (!base64Data) {
-            console.log('[Imagen] Fallback to imagen-3.0-generate-002...');
-            base64Data = await callImagenApi(finalPrompt, 'imagen-3.0-generate-002');
+        let base64Data = null;
+        for (const modelId of modelOrder) {
+            console.log(`[Imagen] Trying engine: ${modelId}...`);
+            base64Data = await callImagenApi(finalPrompt, modelId);
+            if (base64Data) break;
         }
 
         // If successful, save file
@@ -136,11 +126,11 @@ export async function generateAndSaveImage(prompt: string): Promise<string | nul
         } else {
             console.log('[Imagen] All engines failed. Returning fallback from Policy Engine.');
             const { getFallbackImage } = await import('@/lib/image-policy');
-            return getFallbackImage(cleanPrompt);
+            return getFallbackImage(cleanPrompt, excludedPaths);
         }
     } catch (error: any) {
         console.error('[Imagen] Critical Error:', error.message);
         const { getFallbackImage } = await import('@/lib/image-policy');
-        return getFallbackImage(cleanPrompt);
+        return getFallbackImage(cleanPrompt, excludedPaths);
     }
 }

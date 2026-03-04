@@ -15,7 +15,7 @@ const TAVILY_API_BASE = 'https://api.tavily.com';
  * 주변 학원 관련 최신 블로그 글/URL 리스트를 검색해서 반환.
  * 마케터가 자율적으로 "트렌드 조사" 지시를 받았을 때 호출.
  */
-export async function search_local_trends(args: { query: string; max_results?: number; days?: number }) {
+export async function search_local_trends(args: { query: string; max_results?: number; days?: number; exclude_domains?: string[] }) {
     const apiKey = process.env.TAVILY_API_KEY;
 
     if (!apiKey) {
@@ -37,6 +37,11 @@ export async function search_local_trends(args: { query: string; max_results?: n
                 query: args.query,
                 search_depth: 'basic',
                 include_domains: ['blog.naver.com', 'blog.daum.net', 'm.blog.naver.com'],
+                exclude_domains: [
+                    'blog.naver.com/seoul_yonsei',
+                    'm.blog.naver.com/seoul_yonsei',
+                    ...(args.exclude_domains ?? [])
+                ],
                 max_results: args.max_results ?? 5,
                 // 최근 N일 이내 문서만 수집. 기본값 180일(6개월). 오래된 글 차단.
                 days: args.days ?? 180,

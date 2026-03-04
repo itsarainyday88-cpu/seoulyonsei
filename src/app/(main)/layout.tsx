@@ -74,7 +74,7 @@ function Sidebar() {
     const agents = [
         { id: 'Blog', name: 'Blog', role: '원장 직강 전문 라이터', icon: FileText, desc: '국어/수학 전문 칼럼니스트 및 블로그 컨텐츠 제작' },
         { id: 'Insta', name: 'Insta', role: '학원 비주얼 디렉터', icon: Instagram, desc: '수강생 모집/학원 전경 중심의 카드뉴스 기획 및 프롬프트 생성' },
-        { id: 'Dang', name: 'Dang', role: '맘카페/당근 홍보 매니저', icon: Share2, desc: '지역 학부모 커뮤니티(당근마켓) 홍보 및 소통' },
+        { id: 'Dang', name: 'Community', role: '학부모 커뮤니티 리더', icon: Users, desc: '지역 학부모 커뮤니티 및 교육 포럼 리더십 관리' },
         { id: 'Supporter', name: 'Supporter', role: '학부모 상담 실장', icon: MessageSquare, desc: '카카오톡 등 학부모 입학/진도 문의 응대 스크립트 작성' },
         { id: 'Reputation', name: 'Reputation', role: '수강 후기 관리자', icon: ShieldAlert, desc: '학원/강의 리뷰에 대한 맞춤형 답변 생성' },
         { id: 'Marketer', name: 'Marketer', role: '전략가 + 감시관', icon: TrendingUp, desc: '경쟁 학원 동향 분석 및 학원법/광고법 리스크 감시' },
