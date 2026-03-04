@@ -17,6 +17,15 @@ export async function generateAndSaveImage(prompt: string): Promise<string | nul
     // Clean up prompt (remove potential markdown artifacts if passed)
     let cleanPrompt = prompt.replace(/> \*\*Nano Banana Prompt:\*\*/g, '').trim();
 
+    // POLICY CHECK: Should we skip AI generation for real-world assets?
+    const { getImagePolicy } = await import('@/lib/image-policy');
+    const policy = getImagePolicy(cleanPrompt);
+    if (!policy.shouldGenerate) {
+        console.log(`[Policy] Skipping AI generation. Reason: ${policy.reason}`);
+        return policy.selectedImagePath || null;
+    }
+
+
     // FORCE NEGATIVE PROMPT INJECTION (Software Level Override)
     // 2. Basic Constraint: Korean/East Asian Only
     const visuals = "Photographic style. High quality. NO TEXT. Subject: Korean, East Asian. ";
@@ -125,11 +134,13 @@ export async function generateAndSaveImage(prompt: string): Promise<string | nul
             console.log(`[Imagen] Saved to: ${filePath}`);
             return `/generated-images/${filename}`;
         } else {
-            console.log('[Imagen] All engines failed. Returning null → fallback image will be used.');
-            return null;
+            console.log('[Imagen] All engines failed. Returning fallback from Policy Engine.');
+            const { getFallbackImage } = await import('@/lib/image-policy');
+            return getFallbackImage(cleanPrompt);
         }
     } catch (error: any) {
         console.error('[Imagen] Critical Error:', error.message);
-        return null;
+        const { getFallbackImage } = await import('@/lib/image-policy');
+        return getFallbackImage(cleanPrompt);
     }
 }

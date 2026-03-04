@@ -1,11 +1,18 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+require('dotenv').config();
 
 async function check() {
-    const genAI = new GoogleGenerativeAI('AIzaSyAalr8K5vo9ABfGCxmoTZTT69plKLLQWXk');
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey || apiKey === 'YOUR_NEW_API_KEY_HERE') {
+        console.error('[ERROR] GEMINI_API_KEY is not set in .env file');
+        return;
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
 
     console.log('Testing gemini-2.5-flash (NEW TARGET)...');
     try {
-        // Temperature 1.0 explicit logic included
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.5-flash',
             generationConfig: { temperature: 1.0 }
