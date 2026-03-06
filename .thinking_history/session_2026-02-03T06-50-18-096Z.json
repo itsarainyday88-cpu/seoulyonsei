@@ -1,6 +1,0 @@
-{
-  "sessionId": "2026-02-03T06-50-18-096Z",
-  "goal": "Audit the provided content for medical and advertising law violations, specifically looking for absolute expressions, guaranteed treatment effects, exaggerated pain claims, and illegal patient inducement/brokerage. Provide a warning and suggested revision if a violation is found.",
-  "status": "in_progress",
-  "steps": []
-}

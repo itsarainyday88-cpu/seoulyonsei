@@ -42,3 +42,4 @@ config.txt
 .env*
 *.bak
 public/generated-images/
+.thinking_history/
