@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, Mic, Cpu, Bot, User, Save, ShieldAlert, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Send, Paperclip, Mic, Cpu, Bot, User, Save, ShieldAlert, CheckCircle, AlertTriangle, X, FileText } from 'lucide-react';
 import { useAgent } from '@/context/AgentContext';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -21,6 +21,7 @@ export default function ChatInterface() {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
+    const [attachments, setAttachments] = useState<{ name: string; content: string; url?: string }[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Watch for topic injection from CalendarView
@@ -135,15 +136,21 @@ export default function ChatInterface() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     agentId: activeAgent,
-                    message: contextInjection ? userMessage + contextInjection : userMessage,
+                    message: (attachments.length > 0
+                        ? `${userMessage}\n\n[사용자 첨부 파일/이미지 정보]\n${attachments.map((a: { name: string; content: string; url?: string }) => `- 파일명: ${a.name}${a.url ? `\n- 첨부 이미지 URL: ${a.url}` : ''}\n- 분석 내용: ${a.content}${a.url ? `\n🚨 긴급 지시: 위 이미지를 글 작성 시 가장 우선적인 핵심 소재로 활용하고, 본문의 흐름상 가장 적절하고 자연스러운 위치에 \`![${a.name}](${a.url})\` 마크다운 코드를 사용하여 직접 1회 이상 장착하라! (IMAGE_GENERATE 태그로 대체하지 마라!)` : ''}`).join('\n\n---\n\n')}`
+                        : userMessage) + (contextInjection ? contextInjection : ''),
                     history: messages,
                     useSearch: shouldSearch
                 }),
             });
+
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.error || 'Failed to connect');
             }
+
+            // Clear attachments only after successful send
+            setAttachments([]);
 
             if (!res.body) throw new Error('No response body');
 
@@ -293,30 +300,34 @@ export default function ChatInterface() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('file', file);
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
         setLoading(true);
         try {
-            const res = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
+            const uploadPromises = Array.from(files).map(async (file) => {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!res.ok) throw new Error(`${file.name} 업로드 실패`);
+
+                const data = await res.json();
+                // 원장님 말씀대로, 분석이 안 되더라도(data.text가 없더라도) 
+                // 일단 URL(업로드 주소)만 있으면 채팅창에 즉시 붙입니다.
+                return {
+                    name: file.name,
+                    content: data.text || `[분석되지 않은 파일: ${file.name}]`,
+                    url: data.url
+                };
             });
 
-            if (!res.ok) throw new Error('File upload failed');
-
-            const data = await res.json();
-            const text = data.text;
-            const imageUrl = data.url;
-
-            if (imageUrl) {
-                setInput(prev => prev + `\n\n[참고 이미지: ${imageUrl}]\n${text}\n\n`);
-            } else {
-                setInput(prev => prev + `\n\n[참고 파일: ${file.name}]\n${text}\n\n`);
-            }
+            const results = await Promise.all(uploadPromises);
+            setAttachments(prev => [...prev, ...results]);
         } catch (error) {
             console.error('Upload error:', error);
             alert('파일 분석에 실패했습니다.');
@@ -770,6 +781,7 @@ export default function ChatInterface() {
                         ref={fileInputRef}
                         onChange={handleFileUpload}
                         className="hidden"
+                        multiple
                         accept=".pdf,.txt,.md,.pptx,.docx,.xlsx,.png,.jpg,.jpeg,.webp,.csv"
                     />
                     <button
@@ -780,6 +792,53 @@ export default function ChatInterface() {
                         <Paperclip className="w-5 h-5" />
                         <span className="text-[10px] font-bold">파일 첨부</span>
                     </button>
+
+                    {attachments.length > 0 && (
+                        <div className="absolute bottom-full left-0 mb-4 flex flex-wrap gap-3 w-full px-2 max-h-48 overflow-y-auto pb-4 scrollbar-none">
+                            {attachments.map((file: { name: string; content: string; url?: string }, idx: number) => {
+                                const isImage = file.url && (file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+
+                                if (isImage) {
+                                    return (
+                                        <div key={idx} className="relative group animate-in zoom-in-90 fade-in duration-200">
+                                            <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-secondary/30 shadow-lg bg-gray-100 ring-4 ring-white/50">
+                                                <img
+                                                    src={file.url}
+                                                    alt={file.name}
+                                                    className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => setAttachments(prev => prev.filter((_, i: number) => i !== idx))}
+                                                className="absolute -top-2 -right-2 bg-secondary text-white p-1 rounded-full shadow-md hover:bg-primary hover:text-secondary transition-all z-10 scale-0 group-hover:scale-100 duration-200"
+                                            >
+                                                <X className="w-3.5 h-3.5 stroke-[3px]" />
+                                            </button>
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center pointer-events-none">
+                                                <span className="text-[9px] text-white font-bold truncate px-1 w-full text-center">{file.name}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div key={idx} className="flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-secondary/30 px-4 py-2.5 rounded-xl text-[11px] font-bold text-secondary shadow-lg animate-in fade-in slide-in-from-bottom-2 h-fit">
+                                        <div className="bg-secondary/10 p-1.5 rounded-lg">
+                                            <FileText className="w-4 h-4 text-secondary" />
+                                        </div>
+                                        <span className="max-w-[120px] truncate">{file.name}</span>
+                                        <button
+                                            onClick={() => setAttachments(prev => prev.filter((_, i: number) => i !== idx))}
+                                            className="p-1 px-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all ml-1"
+                                        >
+                                            <X className="w-3.5 h-3.5 stroke-[3px]" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
                     <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}

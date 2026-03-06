@@ -1,15 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-// @ts-ignore
-const officeParser = require('office-text-extractor');
-import { GoogleGenerativeAI } from '@google/generative-ai';
-// @ts-ignore
-const PDFParser = require('pdf2json');
-
 import fs from 'fs';
 import path from 'path';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export const dynamic = 'force-dynamic';
 
@@ -23,31 +15,11 @@ export async function POST(req: NextRequest) {
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
-        let text = '';
-
         let imageUrl = '';
 
-        if (file.type === 'application/pdf') {
-            const pdfParser = new PDFParser(null, 1); // 1 = text content only
-
-            text = await new Promise((resolve, reject) => {
-                pdfParser.on("pdfParser_dataError", (errData: any) => reject(errData.parserError));
-                pdfParser.on("pdfParser_dataReady", () => {
-                    resolve(pdfParser.getRawTextContent());
-                });
-                pdfParser.parseBuffer(buffer);
-            });
-        } else if (
-            file.type.includes('presentation') ||
-            file.type.includes('spreadsheet') ||
-            file.type.includes('document') ||
-            file.name.endsWith('.pptx') ||
-            file.name.endsWith('.docx') ||
-            file.name.endsWith('.xlsx')) {
-            // Use office-text-extractor for PPTX/DOCX/XLSX
-            text = await officeParser.getText(buffer);
-        } else if (file.type.startsWith('image/')) {
-            // 1. Save the file to public/uploads
+        // 원장님 말씀대로 "첨부" 단계에서는 분석하지 않고 
+        // 이미지가 올라가면 저장만 확실하게 해줍니다.
+        if (file.type.startsWith('image/')) {
             const uploadDir = path.join(process.cwd(), 'public', 'uploads');
             if (!fs.existsSync(uploadDir)) {
                 fs.mkdirSync(uploadDir, { recursive: true });
@@ -56,26 +28,16 @@ export async function POST(req: NextRequest) {
             const filePath = path.join(uploadDir, fileName);
             fs.writeFileSync(filePath, buffer);
             imageUrl = `/uploads/${fileName}`;
-
-            // 2. Use Gemini Vision to describe the image (Fix model name too)
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const prompt = "Describe this image in detail. Focusing on visual elements, text, and design.";
-            const imagePart = {
-                inlineData: {
-                    data: buffer.toString('base64'),
-                    mimeType: file.type,
-                },
-            };
-            const result = await model.generateContent([prompt, imagePart]);
-            text = `[Image Description by Gemini]:\n${result.response.text()}`;
-        } else {
-            // Assume text/plain or markdown
-            text = buffer.toString('utf-8');
         }
 
-        return NextResponse.json({ text, url: imageUrl });
+        // 분석은 나중으로 미루고, 일단 첨부 정보를 즉시 반환합니다. (0.1초 컷)
+        return NextResponse.json({
+            text: `[Pending Analysis: ${file.name}]`,
+            url: imageUrl,
+            name: file.name
+        });
     } catch (error: any) {
-        console.error('File upload error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('File storage error:', error);
+        return NextResponse.json({ error: '파일 저장 실패' }, { status: 500 });
     }
 }
