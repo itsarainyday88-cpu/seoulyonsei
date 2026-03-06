@@ -60,7 +60,7 @@ function HandoffContent() {
             <p className="text-gray-500 text-sm mb-6 break-keep">
                 {message}
                 {status === 'success' && <br />}
-                {status === 'success' && <span className="text-xs text-blue-600 font-medium">이제 크롬 확장 프로그램(Hwack)이 자동으로 동작할 것입니다.</span>}
+                {status === 'success' && <span className="text-xs text-blue-600 font-medium">이제 크롬 확장 프로그램(Faire Click)이 자동으로 동작할 것입니다.</span>}
             </p>
 
             {status === 'success' && (

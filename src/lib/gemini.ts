@@ -1,8 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSystemInstruction } from './agents/prompts';
 import { generateAndSaveImage } from './imagen';
-import { toolDefinitions, thinkingToolDefinitions, memoryToolDefinitions, searchToolDefinitions } from './tools/definitions';
-import { memoryTools } from './tools/memoryHelpers';
+import { thinkingToolDefinitions, searchToolDefinitions } from './tools/definitions';
 import { thinkingTools } from './tools/thinkingHelpers';
 import { searchTools } from './tools/searchHelpers';
 import { retrieveStyleContext } from './rag';
@@ -30,22 +29,31 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         : history;
 
     const tryStream = async function* (modelName: string, retries = 1) {
-        let tools: any[] = [];
+        // 모든 에이전트: 커스텀 검색(search) 항상 활성화
+        // ⚠️ googleSearch 그라운딩은 functionDeclarations와 동시 사용 불가 (Gemini API 제한)
+        // 모든 에이전트: 커스텀 검색 + 사고(Thinking) 도구 항상 활성화
+        let tools: any[] = [
+            {
+                functionDeclarations: [
+                    ...searchToolDefinitions[0].functionDeclarations,
+                    ...thinkingToolDefinitions[0].functionDeclarations,
+                ]
+            }
+        ];
 
-        if (useSearch) {
-            tools.push({ googleSearch: {} });
-        }
-
-        if (agentId === 'Marketer') {
-            tools = [...tools, ...searchToolDefinitions];
-            console.log(`[Tool] Marketer Research Tools Enabled for ${modelName}`);
-        }
+        console.log(`[Tool] Search + Thinking Tools Enabled for all agents on ${modelName}`);
 
         let systemInstruction = getSystemInstruction(agentId, message);
-        if (['Blog', 'Insta', 'Dang', 'Reputation', 'Supporter'].includes(agentId)) {
+        // RAG 스타일 컨텍스트: Blog 에이전트에만 적용
+        if (agentId === 'Blog') {
             const styleContext = await retrieveStyleContext(message);
             if (styleContext) {
-                systemInstruction += styleContext;
+                // RAG에 실제 원장님 글투 예시가 있으면 하드코딩 지침보다 최우선 적용
+                systemInstruction += `\n\n[✍️ RAG Style Context - 최우선 글투 기준]\n` +
+                    `⚠️ 아래에 실제 원장님이 직접 작성한 과거 포스팅 예시가 있습니다.\n` +
+                    `이 예시의 어투, 문장 길이, 호흡, 단어 선택을 [실제 원장님 글투] 가이드라인보다 최우선으로 따르십시오.\n` +
+                    `아래 예시가 비어있거나 없을 경우에만 [실제 원장님 글투] 섹션의 기본 가이드라인을 따르십시오.\n\n` +
+                    styleContext;
             }
         }
 
@@ -55,7 +63,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             tools: tools as any,
             generationConfig: {
                 temperature: 1.0,
-                maxOutputTokens: 8192,
+                maxOutputTokens: 65536,
             },
         });
 
@@ -131,16 +139,16 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                     const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                                     if (imageUrl) {
                                         usedImageUrls.add(imageUrl);
-                                        yield line.replace(fullMatch, `\n\n![AI 생성 이미지](${imageUrl})\n\n`) + '\n';
+                                        yield line.replace(fullMatch, `\n\n![AI 생성 이미지](${encodeURI(imageUrl)})\n\n`) + '\n';
                                     } else {
                                         const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                                         usedImageUrls.add(fallback);
-                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${fallback})\n\n`) + '\n';
+                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
                                     }
                                 } catch (err) {
                                     const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                                     usedImageUrls.add(fallback);
-                                    yield line.replace(fullMatch, `\n\n![학원 이미지](${fallback})\n\n`) + '\n';
+                                    yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
                                 }
                             } else {
                                 yield line + '\n';
@@ -164,16 +172,16 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                             if (imageUrl) {
                                 usedImageUrls.add(imageUrl);
-                                yield buffer.replace(fullMatch, `\n\n![AI 생성 이미지](${imageUrl})\n\n`);
+                                yield buffer.replace(fullMatch, `\n\n![AI 생성 이미지](${encodeURI(imageUrl)})\n\n`);
                             } else {
                                 const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                                 usedImageUrls.add(fallback);
-                                yield buffer.replace(fullMatch, `\n\n![학원 이미지](${fallback})\n\n`);
+                                yield buffer.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`);
                             }
                         } catch (e) {
                             const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                             usedImageUrls.add(fallback);
-                            yield buffer.replace(fullMatch, `\n\n![학원 이미지](${fallback})\n\n`);
+                            yield buffer.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`);
                         }
                     } else yield buffer;
                 } else yield buffer;
@@ -187,14 +195,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
                 console.log(`[Tool] Executing ${fnName}...`, fnArgs);
 
-                const toolLabels: Record<string, string> = {
-                    'search_local_trends': '🔍 주변 학원 동향을 검색하고 있습니다...',
-                    'scrape_website': `📖 블로그 내용을 분석하는 중입니다... (${fnArgs.url?.substring(0, 30)}...)`,
-                    'init_thinking': '🤔 논리적인 분석을 위해 생각을 정리하고 있습니다...',
-                };
-
-                const statusMsg = toolLabels[fnName] || `🛠️ 도구 호출: ${fnName}`;
-                yield `\n\n> **${statusMsg}**\n\n`;
+                // toolLabels에 따른 메시지 출력을 없애서 최종 결과물(마크다운 본문)이 오염되지 않도록 합니다.
 
                 let toolResult: any;
                 try {
@@ -204,7 +205,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     else if (fnName === 'googleSearch') toolResult = { content: "Search grounding complete." };
                     else if (fnName === 'search_local_trends') toolResult = await searchTools.search_local_trends(fnArgs);
                     else if (fnName === 'scrape_website') toolResult = await searchTools.scrape_website(fnArgs);
-                    else toolResult = { error: "Unknown tool" };
+                    else toolResult = { error: "Unknown tool" }; // memory tools removed
                 } catch (err: any) {
                     toolResult = { error: err.message };
                 }

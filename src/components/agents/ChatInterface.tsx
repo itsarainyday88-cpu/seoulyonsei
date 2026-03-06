@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Send, Paperclip, Mic, Cpu, Bot, User, Save, ShieldAlert, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useAgent } from '@/context/AgentContext';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 interface Message {
     role: 'user' | 'model';
@@ -349,10 +351,18 @@ export default function ChatInterface() {
                         ${msg.role === 'model'
                                     ? 'bg-white rounded-tl-none border border-sand/30 text-foreground'
                                     : 'bg-secondary rounded-tr-none text-primary'}`}>
-                                <ReactMarkdown>{activeAgent !== 'Marketer' && msg.role === 'model'
-                                    ? msg.content.split(/🚦|🚥|Compliance Check/i)[0].trim()
-                                    : msg.content
-                                }</ReactMarkdown>
+                                <ReactMarkdown
+                                    rehypePlugins={[
+                                        rehypeRaw,
+                                        [rehypeSanitize, {
+                                            protocols: {
+                                                href: ['http', 'https', 'mailto', 'tel']
+                                            }
+                                        }]
+                                    ]}
+                                >
+                                    {msg.content}
+                                </ReactMarkdown>
 
 
                                 {/* HWACK: Smart Action Buttons */}
@@ -430,11 +440,11 @@ export default function ChatInterface() {
                                                             // Logic for Blog Agent (Full Content)
                                                             const lines = msg.content.split('\n');
                                                             for (const line of lines) {
-                                                                if (line.toLowerCase().startsWith('title:') || line.toLowerCase().startsWith('제목:')) {
-                                                                    title = line.replace(/title:|제목:/i, '').trim();
+                                                                if (line.trim().startsWith('#') && !line.includes('##')) {
+                                                                    title = line.replace(/^#\s*/, '').trim();
                                                                     break;
-                                                                } else if (line.startsWith('# ')) {
-                                                                    title = line.replace(/^#\s/, '').trim();
+                                                                } else if (line.includes('제목:') || line.includes('Title:')) {
+                                                                    title = line.split(':').slice(1).join(':').trim();
                                                                     break;
                                                                 }
                                                             }
@@ -449,9 +459,9 @@ export default function ChatInterface() {
                                                         const stripMarkdown = (text: string) => {
                                                             return text
                                                                 .replace(/^#+\s+/gm, '') // Headers
-                                                                .replace(/(\*\*|__)(.*?)\1/g, '$2') // Bold
-                                                                .replace(/(\*|_)(.*?)\1/g, '$2') // Italic
-                                                                .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Links
+                                                                .replace(/(\*\*|__)([\s\S]*?)\1/g, '$2') // Bold
+                                                                .replace(/(\*|_)([\s\S]*?)\1/g, '$2') // Italic
+                                                                .replace(/\[([\s\S]*?)\]\([\s\S]*?\)/g, '$1') // Links
                                                                 .replace(/^>\s+/gm, '') // Blockquotes
                                                                 .replace(/^\s*[-*+]\s+/gm, '') // Unordered lists
                                                                 .replace(/^\s*\d+\.\s+/gm, '') // Ordered lists
@@ -488,7 +498,7 @@ export default function ChatInterface() {
 
                                                         const postData = {
                                                             title: title,
-                                                            content: fullBody,
+                                                            content: stripMarkdown(fullBody),
                                                             blocks: blocks
                                                         };
 
@@ -499,7 +509,7 @@ export default function ChatInterface() {
                                                             const res = await fetch('/api/handoff', {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ type: 'HWACK_UPLOAD_NAVER', data: postData })
+                                                                body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_NAVER', data: postData })
                                                             });
                                                             const { id } = await res.json();
                                                             // Electron URL Click 방식을 우회하여 메인 앱 상태를 유지하며 외부 브라우저로 띄움
@@ -512,7 +522,8 @@ export default function ChatInterface() {
                                                             console.error('Handoff error:', e);
                                                             alert('전송 중 오류가 발생했습니다.');
                                                         }
-                                                    }}
+                                                    }
+                                                    }
                                                     className="px-3 py-1.5 bg-[#03C75A] text-white rounded-lg text-xs font-bold hover:bg-[#02b351] transition-colors flex items-center gap-1"
                                                 >
                                                     <span>🚀 네이버 업로드</span>
@@ -535,7 +546,7 @@ export default function ChatInterface() {
                                                         }
 
                                                         const imageRegex = /!\[.*?\]\((.*?)\)/g;
-                                                        const stripMarkdown = (text: string) => text.replace(/^#+\s+/gm, '').replace(/(\*\*|__)(.*?)\1/g, '$2').trim();
+                                                        const stripMarkdown = (text: string) => text.replace(/^#+\s+/gm, '').replace(/(\*\*|__)([\s\S]*?)\1/g, '$2').trim();
 
                                                         // 1. Text Copy (Caption without image markers and without compliance check)
                                                         let rawCaption = fullContent.replace(/!\[.*?\]\(.*?\)/g, '').replace(/Nano Banana Prompt:.*?\n/gi, '');
@@ -609,7 +620,7 @@ export default function ChatInterface() {
                                                             const res = await fetch('/api/handoff', {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ type: 'HWACK_UPLOAD_INSTA', data: { caption: cleanCaption, blocks: blocks } })
+                                                                body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_INSTA', data: { caption: cleanCaption, blocks: blocks } })
                                                             });
                                                             const { id } = await res.json();
                                                             if ((window as any).electronAPI) {
@@ -664,7 +675,7 @@ export default function ChatInterface() {
                                                             const res = await fetch('/api/handoff', {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ type: 'HWACK_UPLOAD_DANG', data: { title: title, content: lines.slice(bodyStartIndex).join('\n') } })
+                                                                body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_DANG', data: { title: title, content: lines.slice(bodyStartIndex).join('\n') } })
                                                             });
                                                             const { id } = await res.json();
                                                             // Electron URL Click 방식을 우회하여 메인 앱 상태를 유지하며 외부 브라우저로 띄움

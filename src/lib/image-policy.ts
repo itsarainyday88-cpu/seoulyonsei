@@ -42,14 +42,34 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
         };
     }
 
-    // 2. 학원 시설/내부 관련 키워드 (FACILITY)
-    // [UPDATE] 이제 시설 관련은 AI 생성(Imagen)을 우선합니다. (다양성 확보)
-    // 실물 사진이 정말로 필요한 경우(예: 특정 명칭의 입구 등)는 나중에 추가 정의 가능.
-    /*
-    if (p.includes('학원') || p.includes('교실') || p.includes('자습실') || p.includes('복도') || p.includes('외관') || p.includes('classroom') || p.includes('academy') || p.includes('study room')) {
-        ...
+    // 2. 학원 시설/내부 관련 키워드 (FACILITY) - 태그별로 분리 매칭
+    let facilityTag: string | null = null;
+
+    if (p.includes('외관') || p.includes('외경') || p.includes('건물') || p.includes('exterior') || p.includes('building')) {
+        facilityTag = 'exterior';
+    } else if (p.includes('입구') || p.includes('현관') || p.includes('entrance') || p.includes('entry')) {
+        facilityTag = 'entrance';
+    } else if (p.includes('자습실') || p.includes('독서실') || p.includes('study room') || p.includes('self-study')) {
+        facilityTag = 'study_room';
+    } else if (p.includes('교실') || p.includes('강의실') || p.includes('수업') || p.includes('classroom') || p.includes('lecture room') || p.includes('학원') || p.includes('academy')) {
+        facilityTag = 'classroom';
     }
-    */
+
+    if (facilityTag) {
+        const filtered = metadata.filter(img =>
+            img.category === 'FACILITY' &&
+            img.tag === facilityTag &&
+            !excludedPaths.includes(img.path)
+        );
+        const selected = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
+        if (selected) {
+            return {
+                shouldGenerate: false,
+                selectedImagePath: selected.path,
+                reason: `Real facility asset matched for tag: ${facilityTag}`
+            };
+        }
+    }
 
     // 3. 로고 관련 (BRANDING)
     if (p.includes('로고') || p.includes('logo')) {

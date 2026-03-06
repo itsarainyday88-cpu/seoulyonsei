@@ -142,7 +142,7 @@ export default function ArchiveView() {
             let postData: any = {};
 
             if (platform === 'NaverBlog') {
-                handoffType = 'HWACK_UPLOAD_NAVER';
+                handoffType = 'FAIRECLICK_UPLOAD_NAVER';
                 let title = "보관함 포스팅";
                 const lines = fullBody.split('\n');
                 for (const line of lines) {
@@ -186,7 +186,7 @@ export default function ArchiveView() {
                 postData = { title, content: fullBody, blocks };
 
             } else if (platform === 'Instagram') {
-                handoffType = 'HWACK_UPLOAD_INSTA';
+                handoffType = 'FAIRECLICK_UPLOAD_INSTA';
                 const imageRegex = /!\[.*?\]\((.*?)\)/g;
                 let rawCaption = fullBody.replace(/!\[.*?\]\(.*?\)/g, '').replace(/Nano Banana Prompt:.*?\n/gi, '');
                 const complianceMatch = rawCaption.match(/\[🚦 Compliance Check\][\s\S]*/);
