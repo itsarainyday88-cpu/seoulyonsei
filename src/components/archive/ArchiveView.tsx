@@ -189,10 +189,7 @@ export default function ArchiveView() {
                 handoffType = 'FAIRECLICK_UPLOAD_INSTA';
                 const imageRegex = /!\[.*?\]\((.*?)\)/g;
                 let rawCaption = fullBody.replace(/!\[.*?\]\(.*?\)/g, '').replace(/Nano Banana Prompt:.*?\n/gi, '');
-                const complianceMatch = rawCaption.match(/\[🚦 Compliance Check\][\s\S]*/);
-                if (complianceMatch) {
-                    rawCaption = rawCaption.substring(0, complianceMatch.index);
-                }
+                rawCaption = rawCaption.split(/🚦|🚥|Compliance Check/i)[0].trim();
                 const cleanCaption = stripMarkdown(rawCaption);
 
                 const blocks: any[] = [];
