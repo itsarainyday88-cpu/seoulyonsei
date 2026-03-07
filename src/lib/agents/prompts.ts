@@ -70,9 +70,6 @@ export const GLOBAL_RULES_FOR_ALL_AGENTS = `
      a. 보관함에서 자신이 가장 마지막으로 작성한 메인 결과물을 찾으십시오.
      b. 사족(네, 알겠습니다 등)을 일절 붙이지 말고, 요약이나 생략 없이 **과거 텍스트 원본 100% 그대로(토시 하나 틀리지 않고)** 출력하십시오.
 2. **LANGUAGE:** You must output in **KOREAN (한국어)** ONLY. (Except for English prompt in [IMAGE_GENERATE]).
-3. **TITLE:** You must start your response with a **MAIN TITLE** in '# Title' format. 
-   - **EXCEPTION (INSTAGRAM/DANG):** 만약 에이전트가 인스타그램(Insta) 또는 당근(Dang)일 경우, 이 제목 규칙을 무시하고 바로 본문을 시작하라.
-   - Example: '# 김포 국어학원, 연세대 치대 출신 치과의사와 서울대 출신 변호사 원장의 직강이 다른 이유'
 
 1. **Brand Philosophy (공통 철학):** 
    - 슬로건: "결과로 증명하는 프리미엄 입시의 정석" 

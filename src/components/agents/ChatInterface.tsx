@@ -372,9 +372,7 @@ export default function ChatInterface() {
                                         }]
                                     ]}
                                 >
-                                    {msg.role === 'model'
-                                        ? msg.content.split(/🚦|🚥|Compliance Check/i)[0].trim()
-                                        : msg.content}
+                                    {msg.content}
                                 </ReactMarkdown>
 
 
@@ -558,6 +556,9 @@ export default function ChatInterface() {
                                                             fullContent = section.replace(/## 2\.\s*🎨\s*Instagram\s*Content/i, '').trim();
                                                         }
 
+                                                        // 도우미 창(확장프로그램) 전송 전 데이터 세척 (블로그와 동일 원리)
+                                                        fullContent = fullContent.split(/🚦|🚥|Compliance Check/i)[0].trim();
+
                                                         const imageRegex = /!\[.*?\]\((.*?)\)/g;
                                                         const stripMarkdown = (text: string) => text.replace(/^#+\s+/gm, '').replace(/(\*\*|__)([\s\S]*?)\1/g, '$2').trim();
 
@@ -661,6 +662,9 @@ export default function ChatInterface() {
                                                             const start = msg.content.indexOf('## 3. 🥕 Danggeun');
                                                             section = msg.content.substring(start);
                                                         }
+
+                                                        // 도우미 창(확장프로그램) 전송 전 데이터 세척 (블로그와 동일 원리)
+                                                        section = section.split(/🚦|🚥|Compliance Check/i)[0].trim();
 
                                                         const lines = section.split('\n').map(l => l.trim()).filter(l => l.length > 0);
                                                         let title = "당근마켓 소식";
