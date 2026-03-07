@@ -21,6 +21,14 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
 } {
     const p = prompt.toLowerCase();
 
+    // 0. 강제 생성 백도어 (FORCE_GENERATE) - 특정 태그가 있으면 모든 검열을 무시하고 통과
+    if (p.includes('[force_generate]')) {
+        return {
+            shouldGenerate: true,
+            reason: 'Force generation requested via [FORCE_GENERATE] tag.'
+        };
+    }
+
     // 1. 강사/원장님 관련 키워드 (PEOPLE)
     if (p.includes('원장') || p.includes('선생님') || p.includes('강사') || p.includes('lecturer') || p.includes('teacher') || p.includes('director')) {
         let tag: ImageTag = 'group';

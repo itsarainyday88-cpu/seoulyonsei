@@ -17,9 +17,13 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
     // Clean up prompt (remove potential markdown artifacts if passed)
     let cleanPrompt = prompt.replace(/> \*\*Nano Banana Prompt:\*\*/g, '').trim();
 
-    // POLICY CHECK: Should we skip AI generation for real-world assets?
+    // POLICY CHECK: Should we skip AI generation for real-world assets? (Tag must be present for check)
     const { getImagePolicy } = await import('@/lib/image-policy');
     const policy = getImagePolicy(cleanPrompt, excludedPaths);
+
+    // CLEAN UP: Strip [FORCE_GENERATE] tag after policy check, but before sending to API
+    cleanPrompt = cleanPrompt.replace(/\[FORCE_GENERATE\]/gi, '').trim();
+
     if (!policy.shouldGenerate) {
         console.log(`[Policy] Skipping AI generation. Reason: ${policy.reason}`);
         return policy.selectedImagePath || null;
