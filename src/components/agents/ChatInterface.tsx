@@ -372,7 +372,9 @@ export default function ChatInterface() {
                                         }]
                                     ]}
                                 >
-                                    {msg.content}
+                                    {msg.role === 'model'
+                                        ? msg.content.split(/🚦|🚥|Compliance Check/i)[0].trim()
+                                        : msg.content}
                                 </ReactMarkdown>
 
 
