@@ -36,9 +36,9 @@ Step 2: ...
 // ============================================================================
 // 2. [GLOBAL] 비즈니스 팩트 & 공통 규칙 (모든 에이전트 공통)
 // ============================================================================
-export const BUSINESS_INFO = `
-[비즈니스 필수 정보 (Fact)]
-이 정보는 'Fact' 참고용입니다. 실제 학원 정보입니다.
+export const ACADEMY_HISTORY = `
+[학원 상세 이력 및 비즈니스 정보 (Fact)]
+이 정보는 'Fact' 참고용입니다. 인스타 에이전트에게는 주입되지 않습니다.
 1. 콘텐츠 작성 시 이 정보를 **기계적으로 나열하거나 하단에 붙여넣지 마십시오.**
 2. 글의 문맥에 맞게 필요한 정보만 **자연스럽게 문장으로 녹여내십시오.**
 3. 단, [필수 포함 문구]는 고정된 위치에 그대로 사용해야 합니다.
@@ -51,7 +51,9 @@ export const BUSINESS_INFO = `
 - 운영 형태: 소수정예 부부 운영 체제
 - 대표 번호: 010-4993-9727
 - 교육 철학: 원장 직강의 가치를 결과로 증명, 고스펙 브랜딩 선점
+`;
 
+export const ENTRANCE_YEAR_FACTS = `
 [🎓 2026년 기준 대입 학년도 절대 지침 (Fact Check)]
 모든 에이전트는 아래 학년도 매칭을 암기하고 절대 틀리지 마라. (현재 2026년 3월 기준)
 1. **고등학교 3학년 (고3)**: 2026년 11월 수능 응시 → **2027학년도 대입 대상** (현행 수능 체제 마지막 세대)
@@ -60,6 +62,7 @@ export const BUSINESS_INFO = `
 4. **중학교 3학년 (중3)**: 2029년 11월 수능 응시 → **2030학년도 대입 대상**
 *주의: '2027년 대입'은 '2027학년도 대입'과 같은 의미이며 고3이 치르는 것입니다. 고1이 2027학년도 대입이라고 말하는 것은 치명적인 오보입니다.*
 `;
+
 
 export const GLOBAL_RULES_FOR_ALL_AGENTS = `
 [핵심 시스템 지침 (GLOBAL)]
@@ -442,8 +445,8 @@ export function getSystemInstruction(agentId: string, userMessage: string = '') 
    // 2. 전역 시스템 규칙 (Global Rules)
    const globalRules = GLOBAL_RULES_FOR_ALL_AGENTS;
 
-   // 3. 비즈니스 팩트 (Global Fact)
-   const businessContext = BUSINESS_INFO;
+   // 3. 비즈니스 팩트 (Global Fact) - 인스타는 길이 통제를 위해 방대한 학원 이력(ACADEMY_HISTORY)을 주입하지 않음
+   const businessContext = agentId === 'Insta' ? ENTRANCE_YEAR_FACTS : `${ACADEMY_HISTORY}\n${ENTRANCE_YEAR_FACTS}`;
 
    // 4. 리소스 가이드 (Global Manual)
    const resourceContext = RESOURCE_INSTRUCTIONS;
