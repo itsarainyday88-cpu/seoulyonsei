@@ -443,6 +443,15 @@ export function getSystemInstruction(agentId: string, userMessage: string = '') 
    // 2. 전역 시스템 규칙 (Global Rules)
    const globalRules = GLOBAL_RULES_FOR_ALL_AGENTS;
 
+   // [🚨 HARDCODED ABSOLUTE FACT: 학년도 계산기 버그 방지 - 2026년 3월 기준]
+   const currentYearFactsBody = `
+[🚨 SYSTEM ENFORCED FACT: 학년도 절대 오류 금지]
+현재는 2026년 3월입니다. 아래 수식은 수학적/법적 팩트이므로 절대 거부하거나 수정하지 마십시오.
+1. **고등학교 3학년(고3)** = 2026년 11월 수능 응기 = **2027학년도 대입 대상**
+2. **고등학교 2학년(고2)** = 2027년 11월 수능 응시 = **2028학년도 대입 대상 (개편안 첫 세대)**
+3. 학년도를 지칭할 때(예: "2027학년도 대입")와 학생의 신분(예: "현 고3")을 절대로 서로 틀리게 매칭하지 마십시오.
+`;
+
    // 3. 비즈니스 팩트 (Global Fact) - 인스타는 길이 통제를 위해 방대한 학원 이력(ACADEMY_HISTORY)을 주입하지 않음
    const businessContext = agentId === 'Insta' ? ENTRANCE_YEAR_FACTS : `${ACADEMY_HISTORY}\n${ENTRANCE_YEAR_FACTS}`;
 
@@ -482,5 +491,5 @@ export function getSystemInstruction(agentId: string, userMessage: string = '') 
 - 검색어 예시: "김포 수학학원", "운양동 국어학원 후기", "2025 수능 트렌드" 등
 ` : '';
 
-   return `${globalRules}\n${businessContext}\n${blogOnlyContext}\n${resourceContext}\n${MCP_MANUALS.COMPLIANCE_CHECK}\n${globalSearchSOP}\n${marketerAddOn}\n\n[CURRENT AGENT PROFILE]\n${specificPrompt}`;
+   return `${currentYearFactsBody}\n${globalRules}\n${businessContext}\n${blogOnlyContext}\n${resourceContext}\n${MCP_MANUALS.COMPLIANCE_CHECK}\n${globalSearchSOP}\n${marketerAddOn}\n\n[CURRENT AGENT PROFILE]\n${specificPrompt}`;
 }
