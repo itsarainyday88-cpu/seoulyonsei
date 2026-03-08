@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
             if (!fs.existsSync(uploadDir)) {
                 fs.mkdirSync(uploadDir, { recursive: true });
             }
-            const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+            const fileName = `${Date.now()}-${file.name.replace(/[\s()]+/g, '_')}`;
             const filePath = path.join(uploadDir, fileName);
             fs.writeFileSync(filePath, buffer);
             imageUrl = `/uploads/${fileName}`;

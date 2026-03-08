@@ -137,7 +137,10 @@ export default function ChatInterface() {
                 body: JSON.stringify({
                     agentId: activeAgent,
                     message: (attachments.length > 0
-                        ? `${userMessage}\n\n[사용자 첨부 파일/이미지 정보]\n${attachments.map((a: { name: string; content: string; url?: string }) => `- 파일명: ${a.name}${a.url ? `\n- 첨부 이미지 URL: ${a.url}` : ''}\n- 분석 내용: ${a.content}${a.url ? `\n🚨 긴급 지시: 위 이미지를 글 작성 시 가장 우선적인 핵심 소재로 활용하고, 본문의 흐름상 가장 적절하고 자연스러운 위치에 \`![${a.name}](${a.url})\` 마크다운 코드를 사용하여 직접 1회 이상 장착하라! (IMAGE_GENERATE 태그로 대체하지 마라!)` : ''}`).join('\n\n---\n\n')}`
+                        ? `${userMessage}\n\n[사용자 첨부 파일/이미지 정보]\n${attachments.map((a: any) => `- 파일명: ${a.name}${a.url ? `\n- 첨부 이미지 URL: ${a.url}` : ''}\n- 분석 내용: ${a.content}`).join('\n')}
+\n🚨 [긴급 지시: 이미지 장착 요청]
+너는 위에서 제공된 **${attachments.length}개의 모든 이미지**를 본문(캡션)의 적합한 위치에 각각 \`![파일명](URL)\` 마크다운 태그를 사용하여 **하나도 빠짐없이 1회 이상 직접 출력**해야 한다. 
+이미지들 사이에 적절한 설명글을 넣어 자연스럽게 연결하고, 절대 겹치거나 누락하지 마라. (IMAGE_GENERATE 태그는 사용 금지)`
                         : userMessage) + (contextInjection ? contextInjection : ''),
                     history: messages,
                     useSearch: shouldSearch
@@ -593,16 +596,24 @@ export default function ChatInterface() {
                                                             let slideText = fullContent.substring(imageRegex.lastIndex, nextMatchStart).trim();
                                                             slideText = stripMarkdown(slideText.replace(/Nano Banana Prompt:.*?\n/gi, ''));
 
-                                                            blocks.push({
-                                                                type: 'slide',
-                                                                title: `Image ${downloadCount + 1}`,
-                                                                image: fullUrl,
-                                                                content: slideText || '(캡션 없음)'
-                                                            });
-
                                                             try {
                                                                 const response = await fetch(fullUrl);
                                                                 const blob = await response.blob();
+                                                                const base64 = await new Promise<string>((resolve) => {
+                                                                    const reader = new FileReader();
+                                                                    reader.onloadend = () => resolve(reader.result as string);
+                                                                    reader.readAsDataURL(blob);
+                                                                });
+
+                                                                const compressed = await (window as any).compressImage(base64);
+
+                                                                blocks.push({
+                                                                    type: 'slide',
+                                                                    title: `Image ${downloadCount + 1}`,
+                                                                    image: compressed, // Base64 for extension preview
+                                                                    content: slideText || '(캡션 없음)'
+                                                                });
+
                                                                 const downloadUrl = window.URL.createObjectURL(blob);
                                                                 const a = document.createElement('a');
                                                                 a.href = downloadUrl;
@@ -612,8 +623,11 @@ export default function ChatInterface() {
                                                                 document.body.removeChild(a);
                                                                 window.URL.revokeObjectURL(downloadUrl);
                                                                 downloadCount++;
+
+                                                                // 브라우저의 다중 다운로드 차단 혹은 겹침 방지를 위한 미세한 지연
+                                                                await new Promise(r => setTimeout(r, 300));
                                                             } catch (err) {
-                                                                console.error('Failed to download image:', url, err);
+                                                                console.error('Failed to process image:', url, err);
                                                             }
                                                             lastIndex = imageRegex.lastIndex;
                                                         }
