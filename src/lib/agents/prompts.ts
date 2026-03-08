@@ -74,6 +74,10 @@ export const GLOBAL_RULES_FOR_ALL_AGENTS = `
      a. 보관함에서 자신이 가장 마지막으로 작성한 메인 결과물을 찾으십시오.
      b. 사족(네, 알겠습니다 등)을 일절 붙이지 말고, 요약이나 생략 없이 **과거 텍스트 원본 100% 그대로(토시 하나 틀리지 않고)** 출력하십시오.
 2. **LANGUAGE:** You must output in **KOREAN (한국어)** ONLY. (Except for English prompt in [IMAGE_GENERATE]).
+3. **SITUATIONAL CONTEXT (동적 맥락 반영):**
+   - 너는 \`[TODAY_CONTEXT]\` 섹션에 제공되는 날짜, 요일, 시즌, 날씨 등의 정보를 최우선으로 인지하라.
+   - **모든 마케팅 콘텐츠(블로그, 인스타 등)의 도입부**에서 이 맥락을 언급하며 독자의 공감을 유도하라. (예: "비가 오는 월요일이네요", "새 학기가 시작된 지 벌써 일주일입니다" 등)
+   - 매번 똑같은 정적인 인사말을 반복하는 것을 엄격히 금지하며, 제공된 맥락에 맞춰 서두를 매번 다르게 창조하라.
 
 1. **Brand Philosophy (공통 철학):** 
    - 슬로건: "결과로 증명하는 프리미엄 입시의 정석" 
@@ -354,12 +358,12 @@ export const INSTA_AGENT_PROMPT = `
 **[📝 CAPTION STRUCTURE: RAW OUTPUT]**
 너는 아래 구성으로 문단만 나누어 '텍스트 내용'만 가장 짧게 압축하여 출력하라.
 
-(첫 줄: 강렬한 훅 1줄)
+(첫 줄: 강렬한 훅 1줄, 25~30자 내외의 **완결된 문장**. 절대 중간에 끊지 마라.)
 
 (빈 줄)
 
-📌 (핵심 팩트 1)
-📌 (핵심 팩트 2)
+(📌 핵심 팩트 1: 첫 줄의 훅과 내용이 절대 겹치지 않아야 함. 새로운 정보나 증거 제시.)
+(📌 핵심 팩트 2)
 
 (빈 줄)
 
@@ -443,7 +447,7 @@ export const AGENT_PROMPTS: Record<string, string> = {
    Reputation: REPUTATION_AGENT_PROMPT,
 };
 
-export function getSystemInstruction(agentId: string, userMessage: string = '') {
+export function getSystemInstruction(agentId: string, todayContext: string = "", userMessage: string = ""): string {
    // 1. 에이전트별 특수 역할 (Individual)
    const specificPrompt = AGENT_PROMPTS[agentId] || AGENT_PROMPTS.Marketer;
 
@@ -498,5 +502,11 @@ export function getSystemInstruction(agentId: string, userMessage: string = '') 
 - 검색어 예시: "김포 수학학원", "운양동 국어학원 후기", "2025 수능 트렌드" 등
 ` : '';
 
-   return `${currentYearFactsBody}\n${globalRules}\n${businessContext}\n${blogOnlyContext}\n${resourceContext}\n${MCP_MANUALS.COMPLIANCE_CHECK}\n${globalSearchSOP}\n${marketerAddOn}\n\n[CURRENT AGENT PROFILE]\n${specificPrompt}`;
+   // 6. [NEW] 동적 상황 맥락 (오늘의 날짜, 시즌 등)
+   const dynamicContext = todayContext ? `
+[TODAY_CONTEXT: 실시간 상황 정보]
+${todayContext}
+` : '';
+
+   return `${currentYearFactsBody}\n${dynamicContext}\n${globalRules}\n${businessContext}\n${blogOnlyContext}\n${resourceContext}\n${MCP_MANUALS.COMPLIANCE_CHECK}\n${globalSearchSOP}\n${marketerAddOn}\n\n[CURRENT AGENT PROFILE]\n${specificPrompt}`;
 }

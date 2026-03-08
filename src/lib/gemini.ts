@@ -17,6 +17,39 @@ async function getFallbackImageAsync(promptText: string, usedUrls: string[] = []
     return getFallbackImage(promptText, usedUrls);
 }
 
+const agentTemperatures: Record<string, number> = {
+    Insta: 0.95,
+    Blog: 0.9,
+    Supporter: 0.8,
+    Reputation: 0.8,
+    Community: 0.7,
+    Strategy: 0.7,
+    Marketer: 0.7,
+};
+
+function getTodayContext() {
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const dateStr = now.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+
+    let academicSeason = "";
+    if (month === 3) academicSeason = "새 학기 개강 및 적응기 (첫 단추의 중요성 강조)";
+    else if (month === 4) academicSeason = "1학기 중간고사 대비 모드 (몰입도 극대화)";
+    else if (month === 5) academicSeason = "학습 흐름 유지 및 취약점 보완기";
+    else if (month === 6) academicSeason = "6월 모평 분석 및 기말고사 대비";
+    else if (month === 7) academicSeason = "여름방학 특강 및 성적 반전 골든타임";
+    else if (month === 8) academicSeason = "수시 원서 접수 준비 및 고3 파이널 돌입";
+    else if (month === 9) academicSeason = "9월 모평 및 대입 실전 감각 강화";
+    else if (month === 10) academicSeason = "2학기 중간고사 및 상위권 굳히기";
+    else if (month === 11) academicSeason = "수능 마무리 및 기말고사 시즌";
+    else if (month === 12) academicSeason = "학년 전환기 핵심 관리 및 겨울방학 준비";
+    else if (month === 1) academicSeason = "겨울방학 초몰입 특강 시즌";
+    else if (month === 2) academicSeason = "종업식 및 새 학기 선행 완성";
+
+    return `- 오늘: ${dateStr}\n- 학사 일정 시즌: ${academicSeason}\n- 분위기: 현재 학원가는 새 학기의 설렘 속에서도 상위권 도약을 위한 긴장감이 흐르고 있습니다.`;
+}
+
 // Export as a streaming generator
 export async function* generateAgentResponseStream(agentId: string, message: string, history: any[] = [], useSearch: boolean = false) {
     const usedImageUrls = new Set<string>(); // Track images in this post!
@@ -43,7 +76,8 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
         console.log(`[Tool] Search + Thinking Tools Enabled for all agents on ${modelName}`);
 
-        let systemInstruction = getSystemInstruction(agentId, message);
+        const todayContext = getTodayContext();
+        let systemInstruction = getSystemInstruction(agentId, todayContext, message);
         // RAG 스타일 컨텍스트: Blog 에이전트에만 적용
         if (agentId === 'Blog') {
             const styleContext = await retrieveStyleContext(message);
@@ -62,7 +96,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             systemInstruction: systemInstruction,
             tools: tools as any,
             generationConfig: {
-                temperature: 1.0,
+                temperature: agentTemperatures[agentId] || 0.7,
                 maxOutputTokens: 65536,
             },
         });
@@ -102,6 +136,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
             let buffer = '';
             let isFirstTextPassed = false; // [Insta] 첫 줄 보정을 위한 플래그
+            let instaHookText = ''; // [Insta] 본문 중복 검사를 위한 Hook 저장 변수
             let functionCallDetected = false;
             let functionCallData: any = null;
 
@@ -155,12 +190,22 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                 yield line + '\n';
                             }
                         } else {
-                            let textToYield = line + '\n';
+                            let processedLine = line + '\n';
                             if (agentId === 'Insta' && !isFirstTextPassed && line.trim().length > 0) {
-                                textToYield = enforceInstaHook(line) + '\n';
+                                processedLine = enforceInstaHook(line) + '\n';
+                                instaHookText = processedLine.trim();
                                 isFirstTextPassed = true;
+                                yield processedLine;
+                            } else if (agentId === 'Insta' && isFirstTextPassed && line.trim().startsWith('📌')) {
+                                // 본문의 핵심 팩트가 Hook과 너무 겹치는지 검사
+                                if (!isSimilarToHook(instaHookText, line)) {
+                                    yield processedLine;
+                                } else {
+                                    console.log(`[Insta Filter] Skipping redundant line: ${line}`);
+                                }
+                            } else {
+                                yield processedLine;
                             }
-                            yield textToYield;
                         }
                     }
                     buffer = remainder;
@@ -279,7 +324,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
 /**
  * [Insta 전용] 전문가 조언에 따른 물리적 출력 보정
- * 1. 첫 줄을 후킹 멘트로 간주 (25자 제한)
+ * 1. 첫 줄을 후킹 멘트로 간주 (지능형 길이 제한)
  * 2. 이모지가 없으면 강제 삽입 (앞/뒤/양측 유연)
  */
 function enforceInstaHook(text: string): string {
@@ -291,7 +336,6 @@ function enforceInstaHook(text: string): string {
     const lines = text.split('\n');
     let firstLineIdx = -1;
 
-    // 실제 텍스트가 있는 첫 줄 찾기
     for (let i = 0; i < lines.length; i++) {
         if (lines[i].trim().length > 0) {
             firstLineIdx = i;
@@ -303,19 +347,52 @@ function enforceInstaHook(text: string): string {
 
     let firstLine = lines[firstLineIdx].trim();
 
-    // 1. 길이 제한 (25자)
+    // 1. 지능형 길이 보정 (25~30자 유연)
+    // 무조건 자르는게 아니라, 문장 부호(. ! ?)가 20~35자 사이에 있다면 거기서 끊음
     if (firstLine.length > 25) {
-        firstLine = firstLine.substring(0, 22) + '...';
+        const punctuationMatch = firstLine.substring(15, 35).match(/[.!?]/);
+        if (punctuationMatch && punctuationMatch.index !== undefined) {
+            firstLine = firstLine.substring(0, 15 + punctuationMatch.index + 1);
+        } else {
+            // 문장 부호가 없으면 마지막 공백 위치를 찾아 어절 단위로 자름
+            const lastSpace = firstLine.lastIndexOf(' ', 28);
+            if (lastSpace > 15) {
+                firstLine = firstLine.substring(0, lastSpace) + '...';
+            } else {
+                firstLine = firstLine.substring(0, 22) + '...';
+            }
+        }
     }
 
-    // 2. 이모지 체크 (RegExp for common emojis)
+    // 2. 이모지 체크 및 자동 보강
     const emojiRegex = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/;
     if (!emojiRegex.test(firstLine)) {
-        // 이모지가 없으면 맥락에 따라 앞 또는 뒤에 추가 (여기선 앞뒤 양쪽 시각적 포인트)
         firstLine = `📌 ${firstLine} 💡`;
     }
 
     lines[firstLineIdx] = firstLine;
     return lines.join('\n');
+}
+
+/**
+ * [Insta 전용] Hook과 본문의 중복도를 체크합니다.
+ * 명사/핵심 키워드가 60% 이상 겹치면 중복으로 판단합니다.
+ */
+function isSimilarToHook(hook: string, line: string): boolean {
+    const clean = (t: string) => t.replace(/[^\w\s가-힣]/g, '').split(/\s+/).filter(w => w.length > 1);
+    const hookWords = clean(hook);
+    const lineWords = clean(line);
+
+    if (lineWords.length === 0) return false;
+
+    let matches = 0;
+    for (const word of lineWords) {
+        if (hookWords.some(hw => hw.includes(word) || word.includes(hw))) {
+            matches++;
+        }
+    }
+
+    // 중복 비중이 60%를 넘으면 필터링 대상
+    return (matches / lineWords.length) > 0.6;
 }
 
