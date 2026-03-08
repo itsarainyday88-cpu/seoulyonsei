@@ -27,6 +27,12 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
         cleanPrompt = imageGenerateMatch[1].trim();
     }
 
+    // [🚨 Coding-Level Text Blocking] 
+    // 프롬프트 내에 'text', 'korean text', 'letters' 등 텍스트 생성을 유도하는 키워드가 있으면 강제 삭제
+    cleanPrompt = cleanPrompt.replace(/(display(s)?\s+)?(the\s+)?(korean\s+)?text\s+(['"]?.*['"]?)/gi, '');
+    cleanPrompt = cleanPrompt.replace(/with\s+(a\s+)?(neon\s+)?sign\s+that\s+displays.*/gi, '');
+    cleanPrompt = cleanPrompt.replace(/text|letter|signage|word/gi, '');
+
     // Also remove the standalone [FORCE_GENERATE] tag if it still exists
     cleanPrompt = cleanPrompt.replace(/\[FORCE_GENERATE\]/gi, '').trim();
 
@@ -36,11 +42,11 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
     }
 
 
-    // FORCE NEGATIVE PROMPT INJECTION (Software Level Override)
-    // Basic Constraint: High Quality Photographic Style, NO TEXT in images.
-    const visuals = "Photographic style. High quality. NO TEXT. ";
+    // FORCE KOREAN CONTEXT INJECTION (Software Level Override)
+    // 에이전트가 깜빡해도 무조건 한국인, 한국 학원 배경이 나오도록 강제 주입
+    const visuals = "Photographic style. High quality. NO TEXT. Korean ethnicity people only. Modern Seoul Korean Academy (Hagwon) interior. Asian students with black hair. High-end Korean education environment. ";
 
-    const finalPrompt = visuals + cleanPrompt + " :: Do not include any text, signs, or watermarks.";
+    const finalPrompt = visuals + cleanPrompt + " :: Do not include any text, signs, or watermarks. NO Western features, NO Caucasian, NO non-Asian, NO European style library.";
 
     console.log(`[Imagen] Generating image for: "${finalPrompt.substring(0, 50)}..."`);
 

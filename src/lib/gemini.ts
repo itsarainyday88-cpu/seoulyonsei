@@ -78,6 +78,9 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
         const todayContext = getTodayContext();
         let systemInstruction = getSystemInstruction(agentId, todayContext, message);
+
+        // [📌 핵심] 사용자가 직접 이미지를 첨부했는지 확인 (분석 우선순위 보존 목적)
+        const hasUserAttachedImage = message.includes('![') || message.includes('사용자 첨부') || message.includes('이미지 정보');
         // RAG 스타일 컨텍스트: Blog 에이전트에만 적용
         if (agentId === 'Blog') {
             const styleContext = await retrieveStyleContext(message);
@@ -191,17 +194,28 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             }
                         } else {
                             let processedLine = line + '\n';
-                            if (agentId === 'Insta' && !isFirstTextPassed && line.trim().length > 0) {
-                                processedLine = enforceInstaHook(line) + '\n';
-                                instaHookText = processedLine.trim();
-                                isFirstTextPassed = true;
-                                yield processedLine;
-                            } else if (agentId === 'Insta' && isFirstTextPassed && line.trim().startsWith('📌')) {
-                                // 본문의 핵심 팩트가 Hook과 너무 겹치는지 검사
-                                if (!isSimilarToHook(instaHookText, line)) {
+                            if (agentId === 'Insta') {
+                                // [🚨 Coding-Level Filter] 
+                                // 이미지가 첨부되지 않은 상태(생성 모드)에서만 '유령 인용구'를 자동 삭제합니다.
+                                // 사용자가 이미지를 첨부했다면, 해당 이미지를 언급하는 것은 정당한 분석이므로 필터링하지 않습니다.
+                                if (!hasUserAttachedImage) {
+                                    processedLine = filterInstaPhantomReferences(line) + '\n';
+                                }
+
+                                if (!isFirstTextPassed && processedLine.trim().length > 0) {
+                                    processedLine = enforceInstaHook(processedLine.trim()) + '\n';
+                                    instaHookText = processedLine.trim();
+                                    isFirstTextPassed = true;
                                     yield processedLine;
+                                } else if (isFirstTextPassed && processedLine.trim().startsWith('📌')) {
+                                    // 본문의 핵심 팩트가 Hook과 너무 겹치는지 검사
+                                    if (!isSimilarToHook(instaHookText, processedLine)) {
+                                        yield processedLine;
+                                    } else {
+                                        console.log(`[Insta Filter] Skipping redundant line: ${processedLine.trim()}`);
+                                    }
                                 } else {
-                                    console.log(`[Insta Filter] Skipping redundant line: ${line}`);
+                                    yield processedLine;
                                 }
                             } else {
                                 yield processedLine;
@@ -372,6 +386,36 @@ function enforceInstaHook(text: string): string {
 
     lines[firstLineIdx] = firstLine;
     return lines.join('\n');
+}
+
+/**
+ * [Insta 전용] 존재하지 않는 이미지/카드뉴스 인용구를 코드 레벨에서 삭제합니다.
+ * AI의 '이미지 속에 글자가 있다'는 착각을 보정합니다.
+ */
+function filterInstaPhantomReferences(text: string): string {
+    if (!text.trim()) return text;
+
+    // 필터링할 유령 인용구 리스트 (정규식)
+    const phantomPatterns = [
+        /위\s+카드뉴스(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
+        /이미지(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
+        /사진(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
+        /카드뉴스\s+콘텐츠(에서)?\s+확인하듯/g,
+        /카드뉴스\s+내용대로/g,
+        /카드뉴스(가)?\s+말해주는/g,
+        /^위\s+내용처럼\s+/g,
+        /^이미지(가)?\s+증명하듯\s+/g
+    ];
+
+    let cleanedText = text;
+    for (const pattern of phantomPatterns) {
+        cleanedText = cleanedText.replace(pattern, '').trim();
+    }
+
+    // 문장 시작이 어색하게 짤린 경우 보정 (예: " 확인하듯 ~" -> "~")
+    cleanedText = cleanedText.replace(/^\s+/, '');
+
+    return cleanedText;
 }
 
 /**
