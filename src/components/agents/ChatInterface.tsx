@@ -137,10 +137,9 @@ export default function ChatInterface() {
                 body: JSON.stringify({
                     agentId: activeAgent,
                     message: (attachments.length > 0
-                        ? `${userMessage}\n\n[사용자 첨부 파일/이미지 정보]\n${attachments.map((a: any) => `- 파일명: ${a.name}${a.url ? `\n- 첨부 이미지 URL: ${a.url}` : ''}\n- 분석 내용: ${a.content}`).join('\n')}
-\n🚨 [긴급 지시: 이미지 장착 요청]
-너는 위에서 제공된 **${attachments.length}개의 모든 이미지**를 본문(캡션)의 적합한 위치에 각각 \`![파일명](URL)\` 마크다운 태그를 사용하여 **하나도 빠짐없이 1회 이상 직접 출력**해야 한다. 
-이미지들 사이에 적절한 설명글을 넣어 자연스럽게 연결하고, 절대 겹치거나 누락하지 마라. (IMAGE_GENERATE 태그는 사용 금지)`
+                        ? (activeAgent === 'Insta'
+                            ? `[사용자 첨부 이미지]\n${attachments.map((a: any) => `![${a.name}](${a.url})`).join('\n')}\n\n🚨 [필독 지시: 위 첨부 이미지들을 인스타그램 게시물 최상단에 독립적으로 먼저 나열하라. 이미지 사이에 절대 텍스트를 넣지 마라. 모든 이미지가 출력된 후에만 캡션을 시작하라.]\n\n[사용자 요청]\n${userMessage}\n\n[파일 분석 내용]\n${attachments.map((a: any) => `- ${a.name}: ${a.content}`).join('\n')}`
+                            : `${userMessage}\n\n[사용자 첨부 파일/이미지 분석 데이터]\n${attachments.map((a: any) => `- 파일명: ${a.name}\n- 첨부 이미지 URL: ${a.url}\n- 시각적 분석 내용: ${a.content.replace(/안내문|카드뉴스|포스터|글자가\s*적힌|텍스트가\s*포함된/g, '이미지')}`).join('\n\n')}\n\n🚨 [중요 지침]: 위 이미지들을 글의 문맥상 가장 적절하고 자연스러운 위치에 ![파일명](URL) 마크다운 코드를 사용하여 직접 삽입하라. 각 사진이 보여주는 시각적 정보와 분석 내용을 바탕으로 글의 흐름에 어긋나지 않게 내용을 서술하라.`)
                         : userMessage) + (contextInjection ? contextInjection : ''),
                     history: messages,
                     useSearch: shouldSearch

@@ -208,13 +208,41 @@ export default function ArchiveView() {
                     let slideText = fullBody.substring(imageRegex.lastIndex, nextMatchStart).trim();
                     slideText = stripMarkdown(slideText.replace(/Nano Banana Prompt:.*?\n/gi, ''));
 
-                    blocks.push({
-                        type: 'slide',
-                        title: `Image ${downloadCount + 1}`,
-                        image: fullUrl,
-                        content: slideText || '(캡션 없음)'
-                    });
-                    downloadCount++;
+                    try {
+                        const response = await fetch(fullUrl);
+                        const blob = await response.blob();
+                        const base64 = await new Promise<string>((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.readAsDataURL(blob);
+                        });
+
+                        const compressed = await compressImage(base64);
+
+                        blocks.push({
+                            type: 'slide',
+                            title: `Image ${downloadCount + 1}`,
+                            image: compressed, // Base64 for extension preview
+                            content: slideText || '(캡션 없음)'
+                        });
+
+                        // 이미지 실제 다운로드 수행
+                        const downloadUrl = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = downloadUrl;
+                        a.download = `insta_card_${downloadCount + 1}.jpg`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(downloadUrl);
+                        downloadCount++;
+
+                        // 브라우저의 다중 다운로드 차단 혹은 겹침 방지를 위한 딜레이 추가
+                        await new Promise(r => setTimeout(r, 300));
+
+                    } catch (err) {
+                        console.error('Failed to process image:', url, err);
+                    }
                 }
                 postData = { caption: cleanCaption, blocks };
             } else if (platform === 'Community') {

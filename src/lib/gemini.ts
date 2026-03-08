@@ -196,17 +196,19 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             let processedLine = line + '\n';
                             if (agentId === 'Insta') {
                                 // [🚨 Coding-Level Filter] 
-                                // 이미지가 첨부되지 않은 상태(생성 모드)에서만 '유령 인용구'를 자동 삭제합니다.
-                                // 사용자가 이미지를 첨부했다면, 해당 이미지를 언급하는 것은 정당한 분석이므로 필터링하지 않습니다.
-                                if (!hasUserAttachedImage) {
-                                    processedLine = filterInstaPhantomReferences(line) + '\n';
-                                }
+                                // '안내문에서 확인하듯' 같은 유령 인용구를 모든 에이전트에서 자동 삭제합니다.
+                                processedLine = filterPhantomReferences(processedLine) + '\n';
 
                                 if (!isFirstTextPassed && processedLine.trim().length > 0) {
-                                    processedLine = enforceInstaHook(processedLine.trim()) + '\n';
-                                    instaHookText = processedLine.trim();
-                                    isFirstTextPassed = true;
-                                    yield processedLine;
+                                    // [🚨 Fix] 이미지 라인이면 후킹 로직을 건너뛰고 '첫 번째 텍스트'로 간주하지 않음
+                                    if (processedLine.trim().startsWith('![')) {
+                                        yield processedLine;
+                                    } else {
+                                        processedLine = enforceInstaHook(processedLine.trim()) + '\n';
+                                        instaHookText = processedLine.trim();
+                                        isFirstTextPassed = true;
+                                        yield processedLine;
+                                    }
                                 } else if (isFirstTextPassed && processedLine.trim().startsWith('📌')) {
                                     // 본문의 핵심 팩트가 Hook과 너무 겹치는지 검사
                                     if (!isSimilarToHook(instaHookText, processedLine)) {
@@ -344,8 +346,8 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 function enforceInstaHook(text: string): string {
     if (!text.trim()) return text;
 
-    // 이미지가 포함된 라인은 건드리지 않음
-    if (text.includes('![AI 생성 이미지]') || text.includes('![학원 이미지]')) return text;
+    // [🚨 Fix] 이미지가 포함된 라인(![...])은 후킹 멘트 보정 대상에서 절대 제외 (데이터 훼손 방지)
+    if (text.includes('![AI 생성 이미지]') || text.includes('![학원 이미지]') || text.includes('![')) return text;
 
     const lines = text.split('\n');
     let firstLineIdx = -1;
@@ -389,15 +391,16 @@ function enforceInstaHook(text: string): string {
 }
 
 /**
- * [Insta 전용] 존재하지 않는 이미지/카드뉴스 인용구를 코드 레벨에서 삭제합니다.
- * AI의 '이미지 속에 글자가 있다'는 착각을 보정합니다.
+ * [전용 필터] 존재하지 않는 이미지/카드뉴스/안내문 인용구를 코드 레벨에서 삭제합니다.
+ * AI가 이미지 분석 내용을 바탕으로 "위 안내문에서 보듯" 같은 말을 지어내는 것을 방지합니다.
  */
-function filterInstaPhantomReferences(text: string): string {
+function filterPhantomReferences(text: string): string {
     if (!text.trim()) return text;
 
     // 필터링할 유령 인용구 리스트 (정규식)
     const phantomPatterns = [
-        /위\s+카드뉴스(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
+        /위\s+카드뉴스(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯|제공하듯)/g,
+        /위\s+안내문(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯|제공하듯)/g,
         /이미지(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
         /사진(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
         /카드뉴스\s+콘텐츠(에서)?\s+확인하듯/g,
