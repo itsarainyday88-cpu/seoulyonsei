@@ -121,7 +121,7 @@ export default function ChatInterface() {
 
             // --- 크로스 에이전트 컨텍스트: Blog/Insta/Dang이면 오늘 Marketer 결과 불러오기 ---
             let contextInjection = '';
-            if (['Blog', 'Insta', 'Dang'].includes(activeAgent)) {
+            if (['Blog', 'Insta', 'Community'].includes(activeAgent)) {
                 try {
                     const ctxRes = await fetch('/api/context?agentId=Marketer');
                     const ctxData = await ctxRes.json();
@@ -409,7 +409,7 @@ export default function ChatInterface() {
                                                     onClick={() => {
                                                         const cleanContent = msg.content.split('🚦')[0].trim();
                                                         agentMessagesRef.current.set('Marketer', messages);
-                                                        setActiveAgent('Dang');
+                                                        setActiveAgent('Community');
                                                         setInput(`아래 마케터 기획안을 바탕으로 당근마켓 게시물을 작성해주세요:\n\n${cleanContent}`);
                                                     }}
                                                     className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
@@ -649,9 +649,9 @@ export default function ChatInterface() {
                                                 </button>
                                             )}
 
-                                        {/* Danggeun Button */}
+                                        {/* Community Button */}
                                         {(
-                                            (activeAgent === 'Dang') ||
+                                            (activeAgent === 'Community') ||
                                             (msg.content.includes('## 3. 🥕 Danggeun'))
                                         ) && (
                                                 <button
@@ -704,7 +704,7 @@ export default function ChatInterface() {
                                                     }}
                                                     className="px-3 py-1.5 bg-[#FF6F0F] text-white rounded-lg text-xs font-bold hover:bg-[#e65f0a] transition-colors flex items-center gap-1"
                                                 >
-                                                    <span>🚀 당근 업로드</span>
+                                                    <span>🚀 커뮤니티 업로드</span>
                                                 </button>
                                             )}
 
@@ -747,12 +747,7 @@ export default function ChatInterface() {
                                                     >
                                                         <span>⭐ 구글 리뷰 관리</span>
                                                     </button>
-                                                    <button
-                                                        onClick={() => window.open('https://business.daangn.com/', '_blank')}
-                                                        className="px-3 py-1.5 bg-[#FF6F0F] text-white rounded-lg text-xs font-bold hover:bg-[#e65f0a] transition-colors flex items-center gap-1"
-                                                    >
-                                                        <span>⭐ 당근 비즈프로필</span>
-                                                    </button>
+
                                                 </>
                                             )}
 

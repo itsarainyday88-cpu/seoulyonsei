@@ -21,7 +21,13 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
     const { getImagePolicy } = await import('@/lib/image-policy');
     const policy = getImagePolicy(cleanPrompt, excludedPaths);
 
-    // CLEAN UP: Strip [FORCE_GENERATE] tag after policy check, but before sending to API
+    // CLEAN UP: Extract only the description string from [IMAGE_GENERATE: <description>] if it exists
+    const imageGenerateMatch = cleanPrompt.match(/\[IMAGE_GENERATE:\s*([^\]]+)\]/i);
+    if (imageGenerateMatch && imageGenerateMatch[1]) {
+        cleanPrompt = imageGenerateMatch[1].trim();
+    }
+
+    // Also remove the standalone [FORCE_GENERATE] tag if it still exists
     cleanPrompt = cleanPrompt.replace(/\[FORCE_GENERATE\]/gi, '').trim();
 
     if (!policy.shouldGenerate) {
@@ -31,8 +37,8 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
 
 
     // FORCE NEGATIVE PROMPT INJECTION (Software Level Override)
-    // 2. Basic Constraint: Korean/East Asian Only
-    const visuals = "Photographic style. High quality. NO TEXT. Subject: Korean, East Asian. ";
+    // Basic Constraint: High Quality Photographic Style, NO TEXT in images.
+    const visuals = "Photographic style. High quality. NO TEXT. ";
 
     const finalPrompt = visuals + cleanPrompt + " :: Do not include any text, signs, or watermarks.";
 

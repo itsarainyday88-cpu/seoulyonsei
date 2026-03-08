@@ -155,7 +155,7 @@ export default function CalendarView() {
                         <div className="flex-1">
                             <label className="block text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">담당 에이전트 (다중 선택 가능)</label>
                             <div className="flex flex-wrap gap-2">
-                                {['Blog', 'Insta', 'Dang', 'Supporter', 'Reputation', 'Marketer'].map(agent => (
+                                {['Blog', 'Insta', 'Community', 'Supporter', 'Reputation', 'Marketer'].map(agent => (
                                     <button
                                         key={agent}
                                         onClick={() => setSelectedAgents(prev => prev.includes(agent) ? (prev.length > 1 ? prev.filter(a => a !== agent) : prev) : [...prev, agent])}
@@ -202,7 +202,7 @@ export default function CalendarView() {
                                         {entry.work_date}
                                     </td>
                                     <td className="p-4"><StatusBadge status={entry.status || 'planned'} /></td>
-                                    <td className="p-4"><span className={`font-bold text-sm px-2 py-1 rounded ${entry.agent_id === 'Blog' ? 'text-blue-600 bg-blue-50' : entry.agent_id === 'Insta' ? 'text-pink-600 bg-pink-50' : entry.agent_id === 'Dang' ? 'text-orange-600 bg-orange-50' : entry.agent_id === 'Supporter' ? 'text-emerald-600 bg-emerald-50' : entry.agent_id === 'Reputation' ? 'text-purple-600 bg-purple-50' : 'text-slate-600 bg-slate-100'}`}>{entry.agent_id}</span></td>
+                                    <td className="p-4"><span className={`font-bold text-sm px-2 py-1 rounded ${entry.agent_id === 'Blog' ? 'text-blue-600 bg-blue-50' : entry.agent_id === 'Insta' ? 'text-pink-600 bg-pink-50' : entry.agent_id === 'Community' ? 'text-orange-600 bg-orange-50' : entry.agent_id === 'Supporter' ? 'text-emerald-600 bg-emerald-50' : entry.agent_id === 'Reputation' ? 'text-purple-600 bg-purple-50' : 'text-slate-600 bg-slate-100'}`}>{entry.agent_id}</span></td>
                                     <td className="p-4 text-gray-800 font-medium">{entry.topic}</td>
                                     <td className="p-4 text-right">
                                         <div className="flex items-center justify-end gap-2">

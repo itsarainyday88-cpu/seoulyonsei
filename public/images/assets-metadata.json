@@ -1155,13 +1155,6 @@
     "original_name": "fac_국어01.webp"
   },
   {
-    "id": "fac_fac_국어03",
-    "category": "FACILITY",
-    "tag": "classroom",
-    "path": "/images/facilities/fac_국어03.webp",
-    "original_name": "fac_국어03.webp"
-  },
-  {
     "id": "fac_fac_국어04",
     "category": "FACILITY",
     "tag": "classroom",
@@ -1174,13 +1167,6 @@
     "tag": "classroom",
     "path": "/images/facilities/fac_국어06.webp",
     "original_name": "fac_국어06.webp"
-  },
-  {
-    "id": "fac_fac_국어07",
-    "category": "FACILITY",
-    "tag": "classroom",
-    "path": "/images/facilities/fac_국어07.webp",
-    "original_name": "fac_국어07.webp"
   },
   {
     "id": "fac_fac_국어12",
@@ -1225,13 +1211,6 @@
     "original_name": "fac_수학01.webp"
   },
   {
-    "id": "fac_fac_수학02",
-    "category": "FACILITY",
-    "tag": "classroom",
-    "path": "/images/facilities/fac_수학02.webp",
-    "original_name": "fac_수학02.webp"
-  },
-  {
     "id": "fac_fac_수학03",
     "category": "FACILITY",
     "tag": "classroom",
@@ -1244,13 +1223,6 @@
     "tag": "classroom",
     "path": "/images/facilities/fac_수학04.webp",
     "original_name": "fac_수학04.webp"
-  },
-  {
-    "id": "fac_fac_수학05",
-    "category": "FACILITY",
-    "tag": "classroom",
-    "path": "/images/facilities/fac_수학05.webp",
-    "original_name": "fac_수학05.webp"
   },
   {
     "id": "fac_fac_수학06",
@@ -1302,20 +1274,6 @@
     "original_name": "fac_외경03.webp"
   },
   {
-    "id": "fac_fac_외경05",
-    "category": "FACILITY",
-    "tag": "exterior",
-    "path": "/images/facilities/fac_외경05.webp",
-    "original_name": "fac_외경05.webp"
-  },
-  {
-    "id": "fac_fac_외경06",
-    "category": "FACILITY",
-    "tag": "exterior",
-    "path": "/images/facilities/fac_외경06.webp",
-    "original_name": "fac_외경06.webp"
-  },
-  {
     "id": "fac_fac_외경07",
     "category": "FACILITY",
     "tag": "exterior",
@@ -1344,13 +1302,6 @@
     "original_name": "fac_자습실1_02.webp"
   },
   {
-    "id": "fac_fac_자습실1_03",
-    "category": "FACILITY",
-    "tag": "study_room",
-    "path": "/images/facilities/fac_자습실1_03.webp",
-    "original_name": "fac_자습실1_03.webp"
-  },
-  {
     "id": "fac_fac_자습실1_04",
     "category": "FACILITY",
     "tag": "study_room",
@@ -1377,20 +1328,6 @@
     "tag": "study_room",
     "path": "/images/facilities/fac_자습실2_05.webp",
     "original_name": "fac_자습실2_05.webp"
-  },
-  {
-    "id": "fac_fac_자습실2_06",
-    "category": "FACILITY",
-    "tag": "study_room",
-    "path": "/images/facilities/fac_자습실2_06.webp",
-    "original_name": "fac_자습실2_06.webp"
-  },
-  {
-    "id": "fac_fac_자습실2_07",
-    "category": "FACILITY",
-    "tag": "study_room",
-    "path": "/images/facilities/fac_자습실2_07.webp",
-    "original_name": "fac_자습실2_07.webp"
   },
   {
     "id": "fac_fac_자습실2_08",

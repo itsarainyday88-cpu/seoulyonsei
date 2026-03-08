@@ -101,6 +101,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             if (!responseStream) throw new Error("Failed to get response stream");
 
             let buffer = '';
+            let isFirstTextPassed = false; // [Insta] 첫 줄 보정을 위한 플래그
             let functionCallDetected = false;
             let functionCallData: any = null;
 
@@ -154,7 +155,12 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                 yield line + '\n';
                             }
                         } else {
-                            yield line + '\n';
+                            let textToYield = line + '\n';
+                            if (agentId === 'Insta' && !isFirstTextPassed && line.trim().length > 0) {
+                                textToYield = enforceInstaHook(line) + '\n';
+                                isFirstTextPassed = true;
+                            }
+                            yield textToYield;
                         }
                     }
                     buffer = remainder;
@@ -183,8 +189,22 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             usedImageUrls.add(fallback);
                             yield buffer.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`);
                         }
-                    } else yield buffer;
-                } else yield buffer;
+                    } else {
+                        let textToYield = buffer;
+                        if (agentId === 'Insta' && !isFirstTextPassed && buffer.trim().length > 0) {
+                            textToYield = enforceInstaHook(buffer);
+                            isFirstTextPassed = true;
+                        }
+                        yield textToYield;
+                    }
+                } else {
+                    let textToYield = buffer;
+                    if (agentId === 'Insta' && !isFirstTextPassed && buffer.trim().length > 0) {
+                        textToYield = enforceInstaHook(buffer);
+                        isFirstTextPassed = true;
+                    }
+                    yield textToYield;
+                }
             }
 
             // --- Multi-turn Function Chaining (연쇄 호출) ---
@@ -256,3 +276,46 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
     throw lastError || new Error('All latest Gemini models failed. Please check network or API quota.');
 }
+
+/**
+ * [Insta 전용] 전문가 조언에 따른 물리적 출력 보정
+ * 1. 첫 줄을 후킹 멘트로 간주 (25자 제한)
+ * 2. 이모지가 없으면 강제 삽입 (앞/뒤/양측 유연)
+ */
+function enforceInstaHook(text: string): string {
+    if (!text.trim()) return text;
+
+    // 이미지가 포함된 라인은 건드리지 않음
+    if (text.includes('![AI 생성 이미지]') || text.includes('![학원 이미지]')) return text;
+
+    const lines = text.split('\n');
+    let firstLineIdx = -1;
+
+    // 실제 텍스트가 있는 첫 줄 찾기
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim().length > 0) {
+            firstLineIdx = i;
+            break;
+        }
+    }
+
+    if (firstLineIdx === -1) return text;
+
+    let firstLine = lines[firstLineIdx].trim();
+
+    // 1. 길이 제한 (25자)
+    if (firstLine.length > 25) {
+        firstLine = firstLine.substring(0, 22) + '...';
+    }
+
+    // 2. 이모지 체크 (RegExp for common emojis)
+    const emojiRegex = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/;
+    if (!emojiRegex.test(firstLine)) {
+        // 이모지가 없으면 맥락에 따라 앞 또는 뒤에 추가 (여기선 앞뒤 양쪽 시각적 포인트)
+        firstLine = `📌 ${firstLine} 💡`;
+    }
+
+    lines[firstLineIdx] = firstLine;
+    return lines.join('\n');
+}
+

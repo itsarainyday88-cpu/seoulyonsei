@@ -102,7 +102,7 @@ export default function ArchiveView() {
         }
     };
 
-    const handleUploadToHwack = async (doc: Document, platform: 'NaverBlog' | 'Instagram' | 'Dang') => {
+    const handleUploadToHwack = async (doc: Document, platform: 'NaverBlog' | 'Instagram' | 'Community') => {
         try {
             const stripMarkdown = (text: string) => {
                 return text
@@ -217,7 +217,7 @@ export default function ArchiveView() {
                     downloadCount++;
                 }
                 postData = { caption: cleanCaption, blocks };
-            } else if (platform === 'Dang') {
+            } else if (platform === 'Community') {
                 handoffType = 'HWACK_UPLOAD_DANG';
                 const lines = fullBody.split('\n').map(l => l.trim()).filter(l => l.length > 0);
                 let title = "당근마켓 소식";
@@ -384,16 +384,16 @@ export default function ArchiveView() {
                                                 <Share2 className="w-3 h-3" /> 인용/인스타 전송
                                             </button>
                                         )}
-                                        {selectedDoc.agent_id === 'Dang' && (
+                                        {selectedDoc.agent_id === 'Community' && (
                                             <button
-                                                onClick={() => handleUploadToHwack(selectedDoc, 'Dang')}
+                                                onClick={() => handleUploadToHwack(selectedDoc, 'Community')}
                                                 className="px-3 py-1.5 text-[10px] font-bold bg-[#FF822E] text-white rounded-md hover:bg-[#e67529] transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap active:scale-95"
                                             >
                                                 <Send className="w-3 h-3" /> 당근마켓 전송
                                             </button>
                                         )}
                                         {/* Fallback for other agents if needed */}
-                                        {!['Blog', 'Insta', 'Dang'].includes(selectedDoc.agent_id) && (
+                                        {!['Blog', 'Insta', 'Community'].includes(selectedDoc.agent_id) && (
                                             <span className="px-3 py-1.5 text-[10px] text-gray-400 italic">자동 업로드 미지원</span>
                                         )}
                                     </div>

@@ -112,43 +112,50 @@ export const GLOBAL_RULES_FOR_ALL_AGENTS = `
 1. **Static Assets (고정 이미지 사용 규칙):**
    아래 지정된 상황에서만 해당 이미지를 사용하라. **임의로 판단해 사용하지 말 것.**
    - **학원 로고 \`/images/logo.png\`:** 본문 **내용 이미지(Content Image) 자리에는 절대 사용 금지.** 블로그 하단 Contact Info 섹션에서 학원 소개 로고로 1회만 허용.
+   - **학원 시설/외관:** \`/images/exterior.jpg\`(외관), \`/images/lecture_room.jpg\`(강의실), \`/images/Premium.jpg\`(자습실)
+   - **원장/강사 실사 이미지 풀 (Lecturers Image Pool - MANDATORY):**
+     인물을 AI로 생성하는 것은 엄격히 금지된다. 대신 아래의 실제 원장님 사진들을 문맥에 맞게 선택하여 사용하라.
+     - **공통/브랜딩/2인:** \`/images/lecturers/lec_2인_01.webp\` ~ \`16.webp\` 중 하나 (부부 원장의 파트너십, 학원 전체 브랜딩 시)
+     - **국어 원장 단독:** \`/images/lecturers/lec_국어단독_01.webp\` ~ \`28.webp\` 중 하나 (국어 수업, 문해력, 변호사 원장 칼럼 시)
+     - **수학 원장 단독:** \`/images/lecturers/lec_수학단독_01.webp\` ~ \`38.webp\` 중 하나 (수학 수업, 의대 입시, 치대 원장 전문성 강조 시)
+     - *지침: 번호를 무작위로 섞어 사용하여 동일한 사진이 반복 노출되는 '템플릿화'를 방지하라.*
    - **오시는 길/지도:** \`[네이버 지도로 길찾기 (클릭)](https://map.naver.com/p/search/%EC%84%9C%EC%9A%B8%EC%97%B0%EC%84%B8%ED%95%99%EC%9B%90/place/1874895909)\` (위치 안내 시에만)
-   - **학원 외관 \`/images/exterior.jpg\`:** 학원 소개, 위치 안내 섹션에서 선택적으로 사용
-   - **강의실 \`/images/lecture_room.jpg\`:** 수업/교육 환경 소개 시 사용
-   - **자습실 \`/images/Premium.jpg\`:** 자기주도 학습, 스터디 환경 소개 시 사용
-   - **원장님 \`/images/directors.webp\`:** 원장 소개, 전문성 강조 섹션에서만 사용
 
-2. **Generative Images Rules (Global Strict Policy):**
+2. **Generative Images Rules(Global Strict Policy):**
    위 고정 이미지 외에 새로운 상황 연출이 필요하여 이미지를 생성할 때는 **모든 에이전트(All Agents)**가 아래 규칙을 **무조건** 따라야 합니다.
    - **Syntax:** \`[IMAGE_GENERATE: <Detailed English Description>]\`
-   - **🚨 중요 (CRITICAL):** 반드시 대괄호(\`[]\`)를 포함하여 한 줄에 독립적으로 작성하라. 대괄호가 누락되면 이미지가 생성되지 않는다.
-   - **MANDATORY INJECTION (필수 삽입 키워드):**
-     - You MUST append **"Premium educational environment, Korean academy style, photorealistic, clean and modern classroom"** to EVERY prompt.
-     - 생성되는 이미지는 **반드시 학원/교육 맥락(교실, 학습, 수업, 학생)**이어야 한다. 의료·병원·치과 등 교육과 무관한 이미지 생성 금지.
+   - **🚨 중요(CRITICAL):** 반드시 대괄호(\`[]\`)를 포함하여 한 줄에 독립적으로 작성하라. 대괄호가 누락되면 이미지가 생성되지 않는다.
+   - **MANDATORY INJECTION(필수 삽입 키워드):**
+     - **DO NOT** output the keyword outside the tag. You MUST append it inside the brackets like this: \`[IMAGE_GENERATE: <description>, Premium educational environment, Korean academy style, photorealistic, clean and modern classroom]\`
+   - 생성되는 이미지는 **반드시 학원 / 교육 맥락(교실, 학습, 수업, 학생)**이어야 한다. 의료·병원·치과 등 교육과 무관한 이미지 생성 금지.
    - **TEXT RESTRICTION (텍스트 금지):**
      - **DO NOT** include text inside the generated images. (Clean visual only).
      - If text is absolutely unavoidable, it MUST be in **ENGLISH only**.
+   - **RELEVANCE & COMPLEXITY (주제 관련성 및 복잡도 제한):**
+     - 정보글이라 하더라도 **그래프, 통계표, 도표, 캡처 화면 등 복잡한 텍스트/수치가 필요한 이미지는 절대 지시하지 마라.** (AI는 글자를 그리지 못해 기괴한 이미지를 생성한다.)
+     - 무조건 글자 없는 '열중하는 학생 뒷모습', '필기구 셋팅된 프리미엄 책상', '긴장감 있는 빈 강의실' 등으로 대체하여 묘사하라.
    - **🚨 HUMAN PROHIBITION (가상 강사/인물 생성 절대 금지):**
      - 강사, 원장, 선생님 등 **가르치는 사람(Teacher, Instructor)의 모습은 AI로 절대 생성하지 마라.** (허위 광고 및 학부모 혼선 방지)
      - 생성되는 이미지에는 온전히 '학생의 학습하는 뒷모습/손', '빈 강의실', '필기구/교재' 등만 포함되어야 한다.
-     - 만약 글의 문맥상 강사나 원장님의 모습이 반드시 필요하다면, AI 이미지 생성 태그(\`[IMAGE_GENERATE:...]\`)를 쓰지 말고, 실제 원장님 사진인 고정 에셋 \`![원장님 직강](/images/directors.webp)\` 을 그대로 출력하라.
+     - 만약 글의 문맥상 강사나 원장님의 모습이 반드시 필요하다면, AI 이미지 생성 태그(\`[IMAGE_GENERATE:...]\`)를 쓰지 말고, 실제 원장님 사진인 고정 에셋 \`![원장님 직강](/images/directors.webp)\`을 그대로 출력하라.
 
 
-3. **Image Generation Failure Fallback (생성 실패 시 대체 이미지 규칙):**
+3. **Image Generation Failure Fallback(생성 실패 시 대체 이미지 규칙):**
    이미지 생성이 실패하거나 오류가 발생하면, **절대로 빈칸으로 두지 말고** 아래 보유 이미지 중 가장 맥락이 맞는 것으로 대체하라.
 
-   | 상황/맥락 | 대체 이미지 |
-   |---|---|
+   | 상황 / 맥락 | 대체 이미지 |
+   | ---| ---|
    | 학원 브랜드, 타이틀, 인트로 | \`![서울연세학원 로고](/images/logo.png)\` |
    | 수업 현장, 강의, 교육 환경 | \`![프리미엄 강의실](/images/lecture_room.jpg)\` |
    | 자습, 학습 분위기, 스터디 | \`![프리미엄 자습실](/images/Premium.jpg)\` |
    | 학원 소개, 위치, 외관 | \`![학원 외관](/images/exterior.jpg)\` |
-   | 원장님, 강사, 선생님, 전문성 | \`![원장님 직강](/images/directors.webp)\` |
+   | 원장님, 강사, 전문성 | \`![원장님](/images/lecturers/lec_2인_01.webp)\` |
    | 위치 안내, 오시는 길 | \`![약도](/images/map.png)\` |
 
    **적용 원칙:**
-   - 맥락이 애매할 때는 \`/images/directors.webp\` (원장님) 또는 \`/images/lecture_room.jpg\` (강의실)을 우선 사용한다.
+   - 맥락이 애매할 때는 \`/images/lecturers/\` 폴더의 2인 사진(lec_2인_*) 또는 \`/images/lecture_room.jpg\` (강의실)을 우선 사용한다.
    - 이 폴백 이미지들은 실제 학원 실사 사진이므로 어떤 상황에서도 사용해도 무방하다.
+   - 가급적 주제에 맞는(국어/수학/공통) 세부 폴더의 실사 이미지를 찾아 사용하는 것을 지향하라.
 `;
 
 

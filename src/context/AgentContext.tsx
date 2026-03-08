@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-type AgentId = 'Marketer' | 'Blog' | 'Insta' | 'Dang' | 'Supporter' | 'Reputation' | 'Analyst' | 'Web_D';
+type AgentId = 'Marketer' | 'Blog' | 'Insta' | 'Community' | 'Supporter' | 'Reputation' | 'Analyst' | 'Web_D';
 type ViewMode = 'chat' | 'calendar' | 'archive';
 
 interface AgentContextType {
