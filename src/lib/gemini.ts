@@ -5,6 +5,7 @@ import { thinkingToolDefinitions, searchToolDefinitions } from './tools/definiti
 import { thinkingTools } from './tools/thinkingHelpers';
 import { searchTools } from './tools/searchHelpers';
 import { retrieveStyleContext } from './rag';
+import { ACADEMY_HISTORY, ENTRANCE_YEAR_FACTS } from './agents/prompts';
 
 const apiKey = process.env.GEMINI_API_KEY!;
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -157,6 +158,9 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         let functionCallCount = 0;
         const MAX_FUNCTION_CALLS = 10;
 
+        // [📌 Truth-Guard] 신뢰할 수 있는 사실 정보 저장소 (숫자 기반 팩트 체크용)
+        let verifiedFacts = `${message}\n${ACADEMY_HISTORY}\n${ENTRANCE_YEAR_FACTS}\n`;
+
         while (true) {
             let attempt = 0;
             let responseStream = null;
@@ -233,11 +237,17 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             }
                         } else {
                             let processedLine = line + '\n';
-                            if (agentId === 'Insta') {
-                                // [🚨 Coding-Level Filter] 
-                                // '안내문에서 확인하듯' 같은 유령 인용구를 모든 에이전트에서 자동 삭제합니다.
-                                processedLine = filterPhantomReferences(processedLine) + '\n';
 
+                            // [🚨 Coding-Level Filters]
+                            // 1. 유령 인용구 삭제
+                            processedLine = filterPhantomReferences(processedLine) + '\n';
+
+                            // 2. [📌 Truth-Guard] 출처 불분명한 수치 환각 차단 (블로그/마케터 등 전문가 모드에서 강력 작동)
+                            if (agentId !== 'Insta') {
+                                processedLine = verifyFactIntegrity(processedLine, verifiedFacts);
+                            }
+
+                            if (agentId === 'Insta') {
                                 if (!isFirstTextPassed && processedLine.trim().length > 0) {
                                     // [🚨 Fix] 이미지 라인이면 후킹 로직을 건너뛰고 '첫 번째 텍스트'로 간주하지 않음
                                     if (processedLine.trim().startsWith('![')) {
@@ -299,6 +309,9 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     }
                 } else {
                     let textToYield = buffer;
+                    if (agentId !== 'Insta') {
+                        textToYield = verifyFactIntegrity(textToYield, verifiedFacts);
+                    }
                     if (agentId === 'Insta' && !isFirstTextPassed && buffer.trim().length > 0) {
                         textToYield = enforceInstaHook(buffer);
                         isFirstTextPassed = true;
@@ -328,6 +341,11 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     else toolResult = { error: "Unknown tool" }; // memory tools removed
                 } catch (err: any) {
                     toolResult = { error: err.message };
+                }
+
+                // [📌 Truth-Guard] 도구 실행 결과를 사실 정보 저장소에 추가하여 실시간 검증에 활용
+                if (toolResult && typeof toolResult === 'object') {
+                    verifiedFacts += JSON.stringify(toolResult) + "\n";
                 }
 
                 // [Fix] SDK 요구 규격에 맞춰 content.parts 구조로 응답 전달
@@ -440,11 +458,14 @@ function filterPhantomReferences(text: string): string {
     const phantomPatterns = [
         /위\s+카드뉴스(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯|제공하듯)/g,
         /위\s+안내문(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯|제공하듯)/g,
-        /이미지(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
-        /사진(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯)/g,
+        /이미지(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯|적힌|나와있는)/g,
+        /사진(에서)?\s+(확인하듯|보듯|보시는 것처럼|나와\s+있듯|적힌|나와있는)/g,
+        /이미지\s+속\s+(정보|수치|내용|데이터|문구)/g,
+        /사진\s+속\s+(정보|수치|내용|데이터|문구)/g,
         /카드뉴스\s+콘텐츠(에서)?\s+확인하듯/g,
         /카드뉴스\s+내용대로/g,
         /카드뉴스(가)?\s+말해주는/g,
+        /안내문에\s+나와\s+있듯/g,
         /^위\s+내용처럼\s+/g,
         /^이미지(가)?\s+증명하듯\s+/g
     ];
@@ -480,5 +501,34 @@ function isSimilarToHook(hook: string, line: string): boolean {
 
     // 중복 비중이 60%를 넘으면 필터링 대상
     return (matches / lineWords.length) > 0.6;
+}
+
+/**
+ * [📌 Truth-Guard 엔진] 
+ * 수치 데이터(인원, 확률, 연도 등)가 신뢰할 수 있는 소스에 있는지 물리적으로 검증합니다.
+ * 출처가 밝혀지지 않은 허구의 수치를 뱉는 즉시 차단하거나 표시합니다.
+ */
+function verifyFactIntegrity(text: string, knownFacts: string): string {
+    if (!text.trim()) return text;
+
+    // 입시에서 의미 있는 수치 패턴 (명, %, 점, 학년도, 백분위, 등급 등)
+    // 숫자가 포함된 민감한 입시 팩트를 정밀 타겟팅
+    const factPattern = /([1-9]\d*)\s*(명|%|점|학년도|등급|위|%p|원|건|개|배|학기|대|곳|가지)/g;
+
+    return text.replace(factPattern, (match, value) => {
+        // [검증 정책] 
+        // 1. 숫자가 '10' 이하라면 일반적인 서술일 가능성이 높으므로 통과
+        if (parseInt(value) <= 10) return match;
+
+        // 2. 숫자가 신뢰할 수 있는 사실(knownFacts) 문자열에 포함되어 있는지 확인
+        // (단순 포함 여부만으로도 1차적인 강력한 Hallucination 차단 효과가 있음)
+        if (knownFacts.includes(value)) {
+            return match; // 검증 성공
+        }
+
+        // 3. 검증 실패 시: 원장님께 공포의 팩트 체크 신호를 보냄
+        console.warn(`[🚨 Truth-Guard Blocked] Unverified admission stat: ${match} (Source missing)`);
+        return `[🚨 확인 필요: ${match}]`;
+    });
 }
 

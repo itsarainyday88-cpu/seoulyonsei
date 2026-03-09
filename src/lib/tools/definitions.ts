@@ -1,54 +1,3 @@
-export const memoryToolDefinitions = [
-    {
-        functionDeclarations: [
-            // Memory Tools
-            {
-                name: "read_memory",
-                description: "Retrieves strategic information or facts from long-term memory. Use this to recall competitor info, hospital strengths, or past decisions.",
-            },
-            {
-                name: "set_memory",
-                description: "Saves a strategic decision or key information to long-term memory. Use this to remember important context for future conversations.",
-                parameters: {
-                    type: "object",
-                    properties: {
-                        key: {
-                            type: "string",
-                            description: "The category or key for the memory (e.g., 'competitor_A_analysis', 'blog_strategy_2024')."
-                        },
-                        value: {
-                            type: "string",
-                            description: "The detailed information to save."
-                        }
-                    },
-                    required: ["key", "value"]
-                }
-            },
-            {
-                name: "add_fact",
-                description: "Saves a specific fact or detail to memory. Useful for small bits of info like 'Main competitor is Smile Dental' or 'Target audience is 30s women'.",
-                parameters: {
-                    type: "object",
-                    properties: {
-                        key: {
-                            type: "string",
-                            description: "The identifier for the fact."
-                        },
-                        value: {
-                            type: "string",
-                            description: "The fact content."
-                        },
-                        isPermanent: {
-                            type: "boolean",
-                            description: "Set to true if this fact should never be deleted by cleanup processes."
-                        }
-                    },
-                    required: ["key", "value"]
-                }
-            }
-        ]
-    }
-];
 
 export const thinkingToolDefinitions = [
     {
@@ -99,7 +48,6 @@ export const thinkingToolDefinitions = [
 export const toolDefinitions = [
     {
         functionDeclarations: [
-            ...memoryToolDefinitions[0].functionDeclarations,
             ...thinkingToolDefinitions[0].functionDeclarations
         ]
     }
