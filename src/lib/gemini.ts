@@ -104,17 +104,56 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             },
         });
 
-        // SDK 정석 포맷으로 변환
-        const chatHistory = cleanHistory.map(msg => ({
+        // [🛠️ Vision Support] 메시지 내 이미지 URL 추출 및 Parts 변환
+        const prepareMessageParts = async (msg: string) => {
+            const parts: any[] = [];
+            const imageRegex = /!\[.*?\]\((https?:\/\/.*?|data:image\/.*?)\)/g;
+            let lastIndex = 0;
+            let match;
+
+            while ((match = imageRegex.exec(msg)) !== null) {
+                const textBefore = msg.substring(lastIndex, match.index).trim();
+                if (textBefore) parts.push({ text: textBefore });
+
+                const url = match[1];
+                try {
+                    console.log(`[Vision] Fetching image for analysis: ${url}`);
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const buffer = await response.arrayBuffer();
+                        const base64 = Buffer.from(buffer).toString('base64');
+                        const mimeType = response.headers.get('content-type') || 'image/jpeg';
+
+                        parts.push({
+                            inlineData: {
+                                data: base64,
+                                mimeType: mimeType
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.error('[Vision] Failed to fetch image:', url, err);
+                }
+                lastIndex = imageRegex.lastIndex;
+            }
+
+            const remainingText = msg.substring(lastIndex).trim();
+            if (remainingText) parts.push({ text: remainingText });
+
+            return parts.length > 0 ? parts : [{ text: msg }];
+        };
+
+        // SDK 정석 포맷으로 변환 (History에도 시각 정보 반영)
+        const chatHistory = await Promise.all(cleanHistory.map(async (msg) => ({
             role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) }],
-        }));
+            parts: await prepareMessageParts(typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)),
+        })));
 
         const chat = model.startChat({
             history: chatHistory,
         });
 
-        let currentInput: any = message;
+        let currentInput: any = await prepareMessageParts(message);
         let functionCallCount = 0;
         const MAX_FUNCTION_CALLS = 10;
 

@@ -310,6 +310,7 @@ export default function ChatInterface() {
             const uploadPromises = Array.from(files).map(async (file) => {
                 const formData = new FormData();
                 formData.append('file', file);
+                formData.append('agentId', activeAgent);
 
                 const res = await fetch('/api/upload', {
                     method: 'POST',

@@ -1,7 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,35 +8,65 @@ export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
         const file = formData.get('file') as File;
+        const agentId = formData.get('agentId') as string || 'Unknown';
 
         if (!file) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
         }
 
-        const buffer = Buffer.from(await file.arrayBuffer());
-        let imageUrl = '';
+        const buffer = await file.arrayBuffer();
+        const fileName = `${Date.now()}-${file.name.replace(/[\s()]+/g, '_')}`;
 
-        // 원장님 말씀대로 "첨부" 단계에서는 분석하지 않고 
-        // 이미지가 올라가면 저장만 확실하게 해줍니다.
-        if (file.type.startsWith('image/')) {
-            const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-            }
-            const fileName = `${Date.now()}-${file.name.replace(/[\s()]+/g, '_')}`;
-            const filePath = path.join(uploadDir, fileName);
-            fs.writeFileSync(filePath, buffer);
-            imageUrl = `/uploads/${fileName}`;
+        // 1. Supabase Storage 업로드
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('assets')
+            .upload(fileName, buffer, {
+                contentType: file.type,
+                upsert: false
+            });
+
+        if (uploadError) {
+            console.error('[Supabase Storage Error]:', uploadError);
+            throw new Error('Storage upload failed');
         }
 
-        // 분석은 나중으로 미루고, 일단 첨부 정보를 즉시 반환합니다. (0.1초 컷)
+        // 2. Public URL 생성
+        const { data: { publicUrl } } = supabase.storage
+            .from('assets')
+            .getPublicUrl(fileName);
+
+        // 3. assets 테이블에 메타데이터 기록
+        const { data: assetData, error: dbError } = await supabase
+            .from('assets')
+            .insert([{
+                file_name: file.name,
+                file_type: file.type,
+                storage_path: uploadData.path,
+                public_url: publicUrl,
+                agent_id: agentId,
+                metadata: {
+                    size: file.size,
+                    lastModified: file.lastModified
+                }
+            }])
+            .select()
+            .single();
+
+        if (dbError) {
+            console.error('[Supabase DB Error]:', dbError);
+            // Storage에는 올라갔는데 DB 기록에 실패한 경우
+        }
+
+        // 4. 즉시 반환 (Gemini Vision 분석을 위해 URL 포함)
         return NextResponse.json({
-            text: `[Pending Analysis: ${file.name}]`,
-            url: imageUrl,
-            name: file.name
+            text: `[File Analysis Prepared: ${file.name}]`,
+            url: publicUrl,
+            name: file.name,
+            assetId: assetData?.id
         });
+
     } catch (error: any) {
-        console.error('File storage error:', error);
-        return NextResponse.json({ error: '파일 저장 실패' }, { status: 500 });
+        console.error('File processing error:', error);
+        return NextResponse.json({ error: `파일 처리 실패: ${error.message}` }, { status: 500 });
     }
 }
