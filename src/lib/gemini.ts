@@ -21,9 +21,9 @@ async function getFallbackImageAsync(promptText: string, usedUrls: string[] = []
 const agentTemperatures: Record<string, number> = {
     Insta: 0.95,
     Blog: 0.9,
-    Supporter: 0.8,
+    Threads: 0.85,
     Reputation: 0.8,
-    Community: 0.7,
+    Shortform: 0.7,
     Strategy: 0.7,
     Marketer: 0.7,
 };
@@ -82,8 +82,8 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
         // [📌 핵심] 사용자가 직접 이미지를 첨부했는지 확인 (분석 우선순위 보존 목적)
         const hasUserAttachedImage = message.includes('![') || message.includes('사용자 첨부') || message.includes('이미지 정보');
-        // RAG 스타일 컨텍스트: Blog 에이전트에만 적용
-        if (agentId === 'Blog') {
+        // RAG 스타일 컨텍스트: Blog 및 Threads 에이전트에 적용
+        if (agentId === 'Blog' || agentId === 'Threads') {
             const styleContext = await retrieveStyleContext(message);
             if (styleContext) {
                 // RAG에 실제 원장님 글투 예시가 있으면 하드코딩 지침보다 최우선 적용
@@ -183,6 +183,10 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             let buffer = '';
             let isFirstTextPassed = false; // [Insta] 첫 줄 보정을 위한 플래그
             let instaHookText = ''; // [Insta] 본문 중복 검사를 위한 Hook 저장 변수
+            let threadsLineCount = 0; // [Threads] 포스트당 라인수 제한
+            let currentPostNum = 0; // [Threads] 현재 포스트 번호
+            let inThreadsCompliance = false; // [Threads] 컴플라이언스 구간 여부
+            let skipThreadsPost = false; // [Threads] 2개 초과 포스트 스킵 플래그
             let functionCallDetected = false;
             let functionCallData: any = null;
 
@@ -213,6 +217,12 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                         const match = line.match(markerRegex);
 
                         if (match) {
+                            // [🚨 Coding-Level Restriction] Shortform 에이전트는 이미지 생성을 원천 차단
+                            if (agentId === 'Shortform') {
+                                yield line.replace(match[0], '').trim() + '\n';
+                                continue;
+                            }
+
                             const fullMatch = match[0];
                             let promptText = match[1].trim().replace(/^[:\s]+/, '').trim();
                             if (promptText && promptText.length > 5) {
@@ -238,6 +248,12 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                         } else {
                             let processedLine = line + '\n';
 
+                            // [🚨 Coding-Level Restriction] Shortform 에이전트는 모든 마크다운 이미지 출력을 차단
+                            if (agentId === 'Shortform') {
+                                processedLine = processedLine.replace(/!\[.*?\]\(.*?\)/g, '');
+                                if (!processedLine.trim()) continue; // 이미지만 있는 라인은 건너뜀
+                            }
+
                             // [🚨 Coding-Level Filters]
                             // 1. 유령 인용구 삭제
                             processedLine = filterPhantomReferences(processedLine) + '\n';
@@ -247,7 +263,33 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                 processedLine = verifyFactIntegrity(processedLine, verifiedFacts);
                             }
 
-                            if (agentId === 'Insta') {
+                            if (agentId === 'Threads') {
+                                // [🚨 Coding-Level Restriction] 스레드 포스트 본문/개수 제한
+                                const postMatch = processedLine.match(/^Post\s+(\d+):/i);
+                                if (postMatch) {
+                                    const pNum = parseInt(postMatch[1]);
+                                    if (pNum > 2) {
+                                        skipThreadsPost = true;
+                                        continue; // Post 3 이상은 표시하지 않음
+                                    }
+                                    currentPostNum = pNum;
+                                    threadsLineCount = 0;
+                                    inThreadsCompliance = false;
+                                    skipThreadsPost = false;
+                                    yield processedLine;
+                                } else if (processedLine.trim().includes('🚦')) {
+                                    inThreadsCompliance = true;
+                                    skipThreadsPost = false;
+                                    yield processedLine;
+                                } else if (inThreadsCompliance) {
+                                    yield processedLine;
+                                } else if (!skipThreadsPost && processedLine.trim().length > 0) {
+                                    threadsLineCount++;
+                                    if (threadsLineCount <= 2) yield processedLine;
+                                } else if (!skipThreadsPost) {
+                                    yield processedLine;
+                                }
+                            } else if (agentId === 'Insta') {
                                 if (!isFirstTextPassed && processedLine.trim().length > 0) {
                                     // [🚨 Fix] 이미지 라인이면 후킹 로직을 건너뛰고 '첫 번째 텍스트'로 간주하지 않음
                                     if (processedLine.trim().startsWith('![')) {
@@ -309,6 +351,49 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     }
                 } else {
                     let textToYield = buffer;
+
+                    // [🚨 Coding-Level Restriction] Shortform 에이전트는 마지막 출력에서도 이미지 완전 배제
+                    if (agentId === 'Shortform') {
+                        textToYield = textToYield.replace(/!\[.*?\]\(.*?\)/g, '');
+                        textToYield = textToYield.replace(/\[IMAGE_GENERATE:.*?\]/gi, '');
+                    }
+
+                    // [🚨 Coding-Level Restriction] Threads 에러 방지용 최종 필터
+                    if (agentId === 'Threads') {
+                        const lines = textToYield.split('\n');
+                        let finalLines = [];
+                        let f_threadsLineCount = 0;
+                        let f_skipThreadsPost = false;
+                        let f_inThreadsCompliance = false;
+
+                        for (const l of lines) {
+                            const pm = l.match(/^Post\s+(\d+):/i);
+                            if (pm) {
+                                const pNum = parseInt(pm[1]);
+                                if (pNum > 2) {
+                                    f_skipThreadsPost = true;
+                                    continue;
+                                }
+                                f_threadsLineCount = 0;
+                                f_skipThreadsPost = false;
+                                f_inThreadsCompliance = false;
+                                finalLines.push(l);
+                            } else if (l.trim().includes('🚦')) {
+                                f_inThreadsCompliance = true;
+                                f_skipThreadsPost = false;
+                                finalLines.push(l);
+                            } else if (f_inThreadsCompliance) {
+                                finalLines.push(l);
+                            } else if (!f_skipThreadsPost && l.trim().length > 0) {
+                                f_threadsLineCount++;
+                                if (f_threadsLineCount <= 2) finalLines.push(l);
+                            } else if (!f_skipThreadsPost) {
+                                finalLines.push(l);
+                            }
+                        }
+                        textToYield = finalLines.join('\n');
+                    }
+
                     if (agentId !== 'Insta') {
                         textToYield = verifyFactIntegrity(textToYield, verifiedFacts);
                     }

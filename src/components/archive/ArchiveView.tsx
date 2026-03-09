@@ -102,7 +102,7 @@ export default function ArchiveView() {
         }
     };
 
-    const handleUploadToHwack = async (doc: Document, platform: 'NaverBlog' | 'Instagram' | 'Community') => {
+    const handleUploadToHwack = async (doc: Document, platform: 'NaverBlog' | 'Instagram' | 'Threads' | 'Shortform') => {
         try {
             const stripMarkdown = (text: string) => {
                 return text
@@ -245,24 +245,15 @@ export default function ArchiveView() {
                     }
                 }
                 postData = { caption: cleanCaption, blocks };
-            } else if (platform === 'Community') {
-                handoffType = 'HWACK_UPLOAD_DANG';
-                const lines = fullBody.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                let title = "당근마켓 소식";
-                let bodyStartIndex = 0;
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    if (line.toLowerCase().startsWith('title:')) {
-                        title = line.replace(/title:/i, '').trim();
-                        bodyStartIndex = i + 1;
-                        break;
-                    } else if (line.startsWith('#') || line.startsWith('**')) {
-                        title = line.replace(/[#*]/g, '').trim();
-                        bodyStartIndex = i + 1;
-                        break;
-                    }
-                }
-                postData = { title, content: lines.slice(bodyStartIndex).join('\n') };
+            } else if (platform === 'Threads') {
+                handoffType = 'FAIRECLICK_UPLOAD_THREADS';
+                postData = { content: fullBody };
+            } else if (platform === 'Shortform') {
+                // Shortform doesn't have a direct upload yet, just copy to clipboard for now
+                const cleanContent = fullBody.split(/🚦|🚥|Compliance Check/i)[0].trim();
+                navigator.clipboard.writeText(cleanContent);
+                alert('숏폼 대본이 클립보드에 복사되었습니다!');
+                return;
             }
 
             const res = await fetch('/api/handoff', {
@@ -412,16 +403,24 @@ export default function ArchiveView() {
                                                 <Share2 className="w-3 h-3" /> 인용/인스타 전송
                                             </button>
                                         )}
-                                        {selectedDoc.agent_id === 'Community' && (
+                                        {selectedDoc.agent_id === 'Threads' && (
                                             <button
-                                                onClick={() => handleUploadToHwack(selectedDoc, 'Community')}
-                                                className="px-3 py-1.5 text-[10px] font-bold bg-[#FF822E] text-white rounded-md hover:bg-[#e67529] transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap active:scale-95"
+                                                onClick={() => handleUploadToHwack(selectedDoc, 'Threads')}
+                                                className="px-3 py-1.5 text-[10px] font-bold bg-black text-white rounded-md hover:bg-gray-800 transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap active:scale-95"
                                             >
-                                                <Send className="w-3 h-3" /> 당근마켓 전송
+                                                <Share2 className="w-3 h-3" /> 스레드 업로드
+                                            </button>
+                                        )}
+                                        {selectedDoc.agent_id === 'Shortform' && (
+                                            <button
+                                                onClick={() => handleUploadToHwack(selectedDoc, 'Shortform')}
+                                                className="px-3 py-1.5 text-[10px] font-bold bg-secondary text-primary rounded-md hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap active:scale-95"
+                                            >
+                                                <Send className="w-3 h-3" /> 대본 복사하기
                                             </button>
                                         )}
                                         {/* Fallback for other agents if needed */}
-                                        {!['Blog', 'Insta', 'Community'].includes(selectedDoc.agent_id) && (
+                                        {!['Blog', 'Insta', 'Threads', 'Shortform'].includes(selectedDoc.agent_id) && (
                                             <span className="px-3 py-1.5 text-[10px] text-gray-400 italic">자동 업로드 미지원</span>
                                         )}
                                     </div>
