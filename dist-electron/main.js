@@ -38,6 +38,22 @@ const path = __importStar(require("path"));
 const http = __importStar(require("http"));
 const fs = __importStar(require("fs"));
 const child_process_1 = require("child_process");
+const net = __importStar(require("net"));
+// --- Single Instance Lock ---
+const gotTheLock = electron_1.app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    electron_1.app.quit();
+    process.exit(0);
+}
+else {
+    electron_1.app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized())
+                mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
 // --- IPC Listeners ---
 electron_1.ipcMain.on('open-external', (event, url) => {
     const chromePaths = [
@@ -69,9 +85,21 @@ if (cfgFile) {
 }
 // --- Configuration ---
 const isDev = process.env.NODE_ENV === 'development';
-const NEXT_PORT = 3000;
-const NEXT_URL = `http://localhost:${NEXT_PORT}`;
+let NEXT_PORT = 3000;
+let NEXT_URL = `http://localhost:${NEXT_PORT}`;
 let mainWindow = null;
+let nextServerProcess = null;
+function getFreePort() {
+    return new Promise((resolve, reject) => {
+        const srv = net.createServer();
+        srv.unref();
+        srv.on('error', reject);
+        srv.listen(0, () => {
+            const port = srv.address().port;
+            srv.close(() => resolve(port));
+        });
+    });
+}
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
         width: 1280,
@@ -143,28 +171,37 @@ function waitForNextServer(url, timeout = 30000) {
 }
 electron_1.app.whenReady().then(async () => {
     if (!isDev) {
+        // [Stage 2: Dynamic Port Allocation]
+        try {
+            NEXT_PORT = await getFreePort();
+            NEXT_URL = `http://localhost:${NEXT_PORT}`;
+        }
+        catch (e) {
+            console.error('Failed to get free port, fallback to 3000', e);
+        }
         const { spawn } = await Promise.resolve().then(() => __importStar(require('child_process')));
         const serverPath = path.join(process.resourcesPath, 'app', 'server.js');
         const logPath = path.join(path.dirname(electron_1.app.getPath('exe')), 'server_log.txt');
         const logStream = fs.createWriteStream(logPath, { flags: 'a' });
         logStream.write(`\n--- Server Start Attempt: ${new Date().toISOString()} ---\n`);
         logStream.write(`Server Path: ${serverPath}\n`);
-        const server = spawn('node', [serverPath], {
+        logStream.write(`Assigned Port: ${NEXT_PORT}\n`);
+        nextServerProcess = spawn('node', [serverPath], {
             env: { ...process.env, PORT: String(NEXT_PORT) },
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: path.dirname(serverPath),
         });
-        server.stdout?.on('data', (data) => {
+        nextServerProcess.stdout?.on('data', (data) => {
             logStream.write(`[STDOUT] ${data}\n`);
         });
-        server.stderr?.on('data', (data) => {
+        nextServerProcess.stderr?.on('data', (data) => {
             logStream.write(`[STDERR] ${data}\n`);
             console.error(`Next.js server error: ${data}`);
         });
-        server.on('error', (err) => {
+        nextServerProcess.on('error', (err) => {
             logStream.write(`[ERROR] Failed to start server: ${err.message}\n`);
         });
-        server.unref();
+        // We removed server.unref() so Node keeps track of it.
     }
     await waitForNextServer(NEXT_URL);
     createWindow();
@@ -176,4 +213,10 @@ electron_1.app.whenReady().then(async () => {
 electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin')
         electron_1.app.quit();
+});
+// [Stage 1: Graceful Shutdown of Next.js Server]
+electron_1.app.on('before-quit', () => {
+    if (nextServerProcess) {
+        nextServerProcess.kill();
+    }
 });
