@@ -10,7 +10,7 @@ declare const Buffer: any;
  * Generates an image using Gemini Imagen 3 (Nano Banana Pro) via REST API.
  * Saves the image to public/generated-images and returns the public URL.
  */
-export async function generateAndSaveImage(prompt: string, excludedPaths: string[] = []): Promise<string | null> {
+export async function generateAndSaveImage(prompt: string, excludedPaths: string[] = [], agentId?: string): Promise<string | null> {
     const apiKey = process.env.GEMINI_API_KEY || process.env.IMAGEN_API_KEY;
     if (!apiKey) {
         console.error('GEMINI_API_KEY is missing');
@@ -21,7 +21,7 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
     let cleanPrompt = prompt.replace(/> \*\*Nano Banana Prompt:\*\*/g, '').trim();
 
     const { getImagePolicy } = await import('@/lib/image-policy');
-    const policy = getImagePolicy(cleanPrompt, excludedPaths);
+    const policy = getImagePolicy(cleanPrompt, excludedPaths, agentId);
 
     const imageGenerateMatch = cleanPrompt.match(/\[IMAGE_GENERATE:\s*([^\]]+)\]/i);
     if (imageGenerateMatch && imageGenerateMatch[1]) {

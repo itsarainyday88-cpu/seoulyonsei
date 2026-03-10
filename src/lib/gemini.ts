@@ -238,7 +238,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             if (promptText && promptText.length > 5) {
                                 try {
                                     // [🚀 Vercel Optimization] Image Generation (Cloud-Native)
-                                    const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
+                                    const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls), agentId);
                                     if (imageUrl) {
                                         usedImageUrls.add(imageUrl);
                                         // CRITICAL: Don't encodeURI for data URLs as it can corrupt the base64 format.

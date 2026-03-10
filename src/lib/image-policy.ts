@@ -14,18 +14,28 @@ interface ImageAsset {
 /**
  * 프롬프트를 분석하여 AI 생성을 허용할지, 아니면 실물 사진을 반환할지 결정합니다.
  */
-export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
+export function getImagePolicy(prompt: string, excludedPaths: string[] = [], agentId?: string): {
     shouldGenerate: boolean;
     selectedImagePath?: string;
     reason?: string;
 } {
     const p = prompt.toLowerCase();
+    const isInsta = agentId === 'Insta';
 
-    // 0. 강제 생성 백도어 (FORCE_GENERATE) - 특정 태그가 있으면 모든 검열을 무시하고 통과
+    // 0. 강제 생성 백도어
     if (p.includes('[force_generate]')) {
+        return { shouldGenerate: true, reason: 'Force generation requested.' };
+    }
+
+    // [Option 3] 맥락 인식: 인스타 에이전트 + 감성 키워드가 많거나 묘사가 구체적이면 AI 생성 우선
+    const emotionalKeywords = ['감성', '분위기', 'mood', 'cinematic', '열정', '웃음', 'passion', 'smile', 'vibrant', 'lighting'];
+    const hasEmotionalHint = emotionalKeywords.some(k => p.includes(k));
+    const isRichPrompt = p.length > 35;
+
+    if (isInsta && (hasEmotionalHint || isRichPrompt)) {
         return {
             shouldGenerate: true,
-            reason: 'Force generation requested via [FORCE_GENERATE] tag.'
+            reason: `[Insta Choice] Rich/Emotional context detected (${p.length} chars). Prioritizing AI for premium look.`
         };
     }
 
@@ -44,6 +54,10 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
         const selected = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
 
         if (selected) {
+            // [Option 1] 인스타라면 원장님 키워드라도 20% 확률로 AI 생성을 섞어줌
+            if (isInsta && Math.random() < 0.2) {
+                return { shouldGenerate: true, reason: '[Insta Mix] 20% luck: Trying AI version of lecturer for variety.' };
+            }
             return {
                 shouldGenerate: false,
                 selectedImagePath: selected.path,
@@ -73,10 +87,16 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
         );
         const selected = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
         if (selected) {
+            // [Option 1] 인스타라면 시설 키워드 상충 시 6:4 비율로 AI 생성 허용 (기존보다 AI 비중 높힘)
+            const aiWeight = isInsta ? 0.4 : 0.1;
+            if (Math.random() < aiWeight) {
+                return { shouldGenerate: true, reason: `[Insta Mix] AI Weight (${aiWeight}) applied for facility variety.` };
+            }
+
             return {
-                shouldGenerate: true, // [🚨 User Request] Prefer AI generation even for facilities
+                shouldGenerate: false, // Default to Real Asset for trust
                 selectedImagePath: selected.path,
-                reason: `Facility hint found for ${facilityTag}, but allowing AI generation for variety.`
+                reason: `Facility hint found for ${facilityTag}, using real asset for trust.`
             };
         }
     }
