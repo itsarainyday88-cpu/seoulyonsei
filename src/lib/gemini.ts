@@ -63,7 +63,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         : history;
 
     const tryStream = async function* (modelName: string, retries = 1) {
-        // Lite 모드에서는 Vercel 10초 타임아웃 방지를 위해 모든 도구(검색, 사고) 비활성화
+        // 모든 에이전트: 커스텀 검색 + 사고(Thinking) 도구 활성화
         const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
         let tools: any[] | undefined = [
             {
@@ -74,11 +74,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             }
         ];
 
-        if (isLite) {
-            tools = undefined; // 웹 버전에서는 도구 호출 시간조차 아껴야 합니다.
-        }
-
-        console.log(`[Tool] ${isLite ? 'Disabled (Lite-Turbo)' : 'Search + Thinking'} Enabled on ${modelName}`);
+        console.log(`[Tool] ${isLite ? 'Lite' : 'Desktop'} Search + Thinking Enabled on ${modelName}`);
 
         const todayContext = getTodayContext();
         let systemInstruction = getSystemInstruction(agentId, todayContext, message);
@@ -479,10 +475,10 @@ export async function* generateAgentResponseStream(agentId: string, message: str
     // [Final Queue] Lite 모드는 속도 중심(Flash 우선), Desktop은 지능 중심(Pro 우선)
     const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
     const modelQueue = isLite ? [
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
+        'gemini-3.0-flash',
         'gemini-3.1-pro-preview',
         'gemini-3-pro-preview',
+        'gemini-2.0-flash',
     ] : [
         'gemini-3.1-pro-preview',
         'gemini-3-pro-preview',
