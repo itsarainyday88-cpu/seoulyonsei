@@ -63,19 +63,18 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         : history;
 
     const tryStream = async function* (modelName: string, retries = 1) {
-        // 모든 에이전트: 커스텀 검색(search) 항상 활성화
-        // ⚠️ googleSearch 그라운딩은 functionDeclarations와 동시 사용 불가 (Gemini API 제한)
-        // 모든 에이전트: 커스텀 검색 + 사고(Thinking) 도구 항상 활성화
+        // Lite 모드에서는 Vercel 10초 타임아웃 방지를 위해 검색 도구 제외
+        const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
         let tools: any[] = [
             {
                 functionDeclarations: [
-                    ...searchToolDefinitions[0].functionDeclarations,
+                    ...(isLite ? [] : searchToolDefinitions[0].functionDeclarations),
                     ...thinkingToolDefinitions[0].functionDeclarations,
                 ]
             }
         ];
 
-        console.log(`[Tool] Search + Thinking Tools Enabled for all agents on ${modelName}`);
+        console.log(`[Tool] ${isLite ? 'Thinking (Lite)' : 'Search + Thinking'} Tools Enabled for all agents on ${modelName}`);
 
         const todayContext = getTodayContext();
         let systemInstruction = getSystemInstruction(agentId, todayContext, message);
