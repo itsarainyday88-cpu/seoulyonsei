@@ -473,12 +473,12 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
     // [Final Queue] 원장님 원래 설정 모델 리스트 (지능 중심)
     const modelQueue = [
+        'gemini-3-flash-preview',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
         'gemini-3.1-pro-preview',
         'gemini-3-pro-preview',
-        'gemini-3-flash-preview',
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash'
+        'gemini-2.5-pro'
     ];
 
     let lastError: any = null;
