@@ -32,32 +32,37 @@ export async function POST(req: Request) {
                     }
 
 
-                    // --- Cloud Sync: Save to Supabase (Always or Lite) ---
+                    // --- Cloud Sync: Save to Supabase (Unified Upsert/Insert) ---
                     if (fullResponseBuffer.trim().length > 50) {
                         try {
-                            const payload = {
+                            const kst = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+                            const todayStr = kst.toISOString().split('T')[0];
+
+                            const isMarketer = String(agentId) === 'Marketer';
+                            const payload: any = {
                                 agent_id: String(agentId),
                                 content: fullResponseBuffer,
                                 created_at: new Date().toISOString()
                             };
-                            console.log('[Cloud Sync] Attempting Supabase insert into [documents]...', { agent: payload.agent_id, length: payload.content.length });
 
-                            try {
-                                const { data: syncResult, error: dbError } = await supabase
-                                    .from('documents')
-                                    .insert([payload])
-                                    .select();
+                            // [🚀 Vercel Optimization] Use fixed ID for Marketer to prevent duplicates with context API
+                            if (isMarketer) {
+                                payload.id = `marketer_${todayStr}`;
+                            }
 
-                                if (dbError) {
-                                    console.error('[Cloud Sync] DB insert error (documents):', dbError.message, dbError.code, dbError.details);
-                                } else {
-                                    console.log(`[Cloud Sync] Document successfully synced to Supabase. ID: ${syncResult?.[0]?.id}`);
-                                }
-                            } catch (syncErr: any) {
-                                console.error('[Cloud Sync] Supabase sync unexpected error:', syncErr.message);
+                            console.log('[Cloud Sync] Attempting Supabase sync...', { agent: payload.agent_id, isMarketer });
+
+                            const { error: dbError } = await supabase
+                                .from('documents')
+                                .upsert(payload, { onConflict: 'id' });
+
+                            if (dbError) {
+                                console.error('[Cloud Sync] DB sync error:', dbError.message);
+                            } else {
+                                console.log(`[Cloud Sync] Successfully synced to Supabase (Mode: ${isMarketer ? 'Upsert' : 'Insert'})`);
                             }
                         } catch (cloudErr: any) {
-                            console.error('[Cloud Sync] Error preparing cloud sync:', cloudErr.message);
+                            console.error('[Cloud Sync] Error during sync:', cloudErr.message);
                         }
                     }
 

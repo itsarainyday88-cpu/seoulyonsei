@@ -1,4 +1,4 @@
-// [🚨 Web-Lite Optimization] No top-level 'fs' or 'path' to avoid Vercel crash
+// [🚨 File System Access] No top-level 'fs' or 'path' to avoid Vercel crash
 import crypto from 'crypto';
 
 // @ts-ignore
@@ -106,25 +106,8 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
         }
 
         if (base64Data) {
-            // [🚨 Web-Lite Optimization] Directly skip FS if in lite mode
-            if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
-                return `data:image/png;base64,${base64Data}`;
-            }
-
-            // For local dev, import FS dynamically
-            const fs = await import('fs');
-            const path = await import('path');
-
-            const buffer = Buffer.from(base64Data, 'base64');
-            const publicDir = path.join(process.cwd(), 'public', 'generated-images');
-            if (!fs.existsSync(publicDir)) {
-                fs.mkdirSync(publicDir, { recursive: true });
-            }
-            const hash = crypto.createHash('md5').update(cleanPrompt + Date.now().toString()).digest('hex').substring(0, 8);
-            const filename = `${Date.now()}-${hash}.png`;
-            const filePath = path.join(publicDir, filename);
-            fs.writeFileSync(filePath, buffer);
-            return `/generated-images/${filename}`;
+            // [🚀 Vercel Optimization] Directly return Base64 to avoid FS issues
+            return `data:image/png;base64,${base64Data}`;
         } else {
             const { getFallbackImage } = await import('@/lib/image-policy');
             return getFallbackImage(cleanPrompt, excludedPaths);

@@ -237,18 +237,13 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             let promptText = match[1].trim().replace(/^[:\s]+/, '').trim();
                             if (promptText && promptText.length > 5) {
                                 try {
-                                    // [🚨 Image Generation] Attempt real-time generation (Imagen 3/4)
-                                    // The generateAndSaveImage function now handles 'lite' mode safely by returning Base64.
+                                    // [🚀 Vercel Optimization] Image Generation (Cloud-Native)
                                     const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                                     if (imageUrl) {
                                         usedImageUrls.add(imageUrl);
-                                        // If it's a data URL (Base64), it came from AI generation in lite mode
-                                        const label = imageUrl.startsWith('data:') ? 'AI 실시간 생성' : 'AI 생성 이미지';
-
                                         // CRITICAL: Don't encodeURI for data URLs as it can corrupt the base64 format.
-                                        // But keep it for local paths which may have spaces.
                                         const finalUrl = imageUrl.startsWith('data:') ? imageUrl : encodeURI(imageUrl);
-                                        yield line.replace(fullMatch, `\n\n![${label}](${finalUrl})\n\n`) + '\n';
+                                        yield line.replace(fullMatch, `\n\n![AI 생성 이미지](${finalUrl})\n\n`) + '\n';
                                     } else {
                                         const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                                         if (fallback) {
@@ -256,8 +251,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                             yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
                                         }
                                     }
-
-                                    continue; // Fixed: Processed by the [🚨 Image Generation] block above.
+                                    continue;
                                 } catch (err) {
                                     const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                                     usedImageUrls.add(fallback);
@@ -348,13 +342,6 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     let promptText = match[1].trim();
                     if (promptText && promptText.length > 5) {
                         try {
-                            // [🚨 Lite Mode Optimization] 
-                            if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
-                                const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
-                                usedImageUrls.add(fallback);
-                                yield buffer.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`);
-                                return;
-                            }
 
                             const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                             if (imageUrl) {
