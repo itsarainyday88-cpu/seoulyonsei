@@ -101,14 +101,10 @@ function Sidebar() {
                     className="text-left group hover:opacity-70 transition-opacity"
                     title="새로고침 (초기화)"
                 >
-                    <div className="flex flex-col gap-0.5">
-                        <h1 className="text-lg font-black tracking-tight text-secondary">서울연세 <span className="text-primary font-black">MARKETING OS</span></h1>
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-full w-fit">
-                            <Sparkles className="w-2.5 h-2.5" />
-                            <span>WEB-LITE ACTIVE</span>
-                        </div>
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-3xl font-black tracking-tight text-secondary">서울연세</h1>
+                        <p className="text-[11px] text-secondary/60 tracking-wider font-medium">Academy Growth Solution</p>
                     </div>
-                    <p className="text-xs text-secondary/60 tracking-wider">Academy Growth Solution</p>
                 </button>
             </div>
 
@@ -189,8 +185,10 @@ function Sidebar() {
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-[11px]">
-                                <span className="text-foreground/50 font-medium">Legal Filter</span>
-                                <span className="text-secondary font-bold flex items-center gap-1 text-[10px]">ACTIVE</span>
+                                <span className="text-foreground/50 font-medium">System Mode</span>
+                                <span className="text-primary font-bold px-2 py-0.5 bg-secondary/80 rounded-full text-[9px] flex items-center gap-1">
+                                    <Sparkles className="w-2.5 h-2.5" /> WEB-LITE
+                                </span>
                             </div>
                             <div className="pt-2 border-t border-secondary/10">
                                 <p className="text-[10px] text-foreground/40 leading-relaxed italic">
