@@ -43,11 +43,13 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
         );
         const selected = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
 
-        return {
-            shouldGenerate: false,
-            selectedImagePath: selected?.path || '/images/directors.webp',
-            reason: `Real lecturer asset matched for tag: ${tag}`
-        };
+        if (selected) {
+            return {
+                shouldGenerate: false,
+                selectedImagePath: selected.path,
+                reason: `Real lecturer asset matched for tag: ${tag}`
+            };
+        }
     }
 
     // 2. 학원 시설/내부 관련 키워드 (FACILITY) - 태그별로 분리 매칭
@@ -100,5 +102,18 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
  */
 export function getFallbackImage(prompt: string, excludedPaths: string[] = []): string {
     const policy = getImagePolicy(prompt, excludedPaths);
-    return policy.selectedImagePath || '/images/lecture_room.jpg';
+
+    if (policy.selectedImagePath && !excludedPaths.includes(policy.selectedImagePath)) {
+        return policy.selectedImagePath;
+    }
+
+    // 만약 정책 엔진이 실패하거나 이미 사용된 이미지를 뱉었다면, 
+    // 라이브러리 전체에서 아직 안 쓴 이미지를 랜덤하게 하나 고릅니다.
+    const unused = metadata.filter(img => !excludedPaths.includes(img.path));
+    if (unused.length > 0) {
+        return unused[Math.floor(Math.random() * unused.length)].path;
+    }
+
+    // 진짜 다 썼다면 최후의 보루 (이건 어쩔 수 없이 중복 허용)
+    return '/images/lecture_room.jpg';
 }

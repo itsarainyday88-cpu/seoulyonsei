@@ -241,9 +241,11 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                     // On Vercel, skip slow AI generation and potential 'fs' crash.
                                     // Directly use Policy Engine's fallback images for instant response.
                                     if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
-                                        const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
+                                        const excluded = Array.from(usedImageUrls);
+                                        const fallback = await getFallbackImageAsync(promptText, excluded);
                                         if (fallback) {
                                             usedImageUrls.add(fallback);
+                                            console.log(`[Lite Image Fix] Chosen: ${fallback}, Total Used: ${usedImageUrls.size}`);
                                         }
                                         yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback || '')})\n\n`) + '\n';
                                         continue;
