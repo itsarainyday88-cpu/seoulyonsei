@@ -63,7 +63,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         : history;
 
     const tryStream = async function* (modelName: string, retries = 1) {
-        // 모든 에이전트: 커스텀 검색 + 사고(Thinking) 도구 활성화
+        // Lite 모드에서는 Vercel 10초 타임아웃 방지를 위해 모든 도구(검색, 사고) 비활성화
         const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
         let tools: any[] | undefined = [
             {
@@ -74,7 +74,11 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             }
         ];
 
-        console.log(`[Tool] ${isLite ? 'Lite' : 'Desktop'} Search + Thinking Enabled on ${modelName}`);
+        if (isLite) {
+            tools = undefined; // 원장님, 웹 버전은 구글 검색 시간조차 아껴야 10초 안에 답변이 나옵니다.
+        }
+
+        console.log(`[Tool] ${isLite ? 'Disabled (Lite-Turbo)' : 'Search + Thinking'} Enabled on ${modelName}`);
 
         const todayContext = getTodayContext();
         let systemInstruction = getSystemInstruction(agentId, todayContext, message);
