@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// [🚨 Web-Lite Optimization] Totally avoid importing 'fs', 'path', 'os' at the top level
-// to prevent Vercel/Edge runtime from crashing due to restricted module access.
+import { supabase } from '@/lib/supabase';
 
 const today = () => new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
@@ -12,9 +10,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'agentId and content required' }, { status: 400 });
         }
 
-        // Check mode first
+        // --- Cloud Sync (Always attempted for Marketer results) ---
+        if (agentId === 'Marketer') {
+            await supabase.from('documents').insert([{
+                agent_id: 'Marketer',
+                content: content,
+                created_at: new Date().toISOString()
+            }]);
+        }
+
+        // Check mode for local persistence
         if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
-            console.log('[Context] Lite mode: skipping local save (no FS hit)');
+            console.log('[Context] Lite mode: using Cloud Sync only');
             return NextResponse.json({ ok: true });
         }
 
@@ -39,7 +46,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
     } catch (e: any) {
         console.error('[Context API Error]', e.message);
-        // Fail silently for context saving to not interrupt chat
         return NextResponse.json({ ok: false, error: e.message });
     }
 }
@@ -48,7 +54,19 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const agentId = searchParams.get('agentId');
-        if (!agentId || process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+        if (!agentId) return NextResponse.json({ context: null });
+
+        // In Lite mode, fetch from Supabase
+        if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+            const { data, error } = await supabase
+                .from('documents')
+                .select('content')
+                .eq('agent_id', agentId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (data) return NextResponse.json({ context: data.content });
             return NextResponse.json({ context: null });
         }
 

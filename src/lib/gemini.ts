@@ -73,6 +73,18 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             }
         ];
 
+        // [📌 Search Enable] Google Search Retrieval 활성화 (Grounding 기능)
+        if (useSearch) {
+            tools.push({
+                googleSearchRetrieval: {
+                    dynamicRetrievalConfig: {
+                        mode: "MODE_DYNAMIC",
+                        dynamicThreshold: 0.3,
+                    },
+                },
+            });
+        }
+
         console.log(`[Tool] Search + Thinking Tools Enabled on ${modelName}`);
 
         const todayContext = getTodayContext();
@@ -433,9 +445,9 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
                 let toolResult: any;
                 try {
-                    if (fnName === 'init_thinking') toolResult = thinkingTools.init_thinking(fnArgs);
-                    else if (fnName === 'add_thought_step') toolResult = thinkingTools.add_thought_step(fnArgs);
-                    else if (fnName === 'reflect_thinking') toolResult = thinkingTools.reflect_thinking();
+                    if (fnName === 'init_thinking') toolResult = await thinkingTools.init_thinking(fnArgs);
+                    else if (fnName === 'add_thought_step') toolResult = await thinkingTools.add_thought_step(fnArgs);
+                    else if (fnName === 'reflect_thinking') toolResult = await thinkingTools.reflect_thinking();
                     else if (fnName === 'googleSearch') toolResult = { content: "Search grounding complete." };
                     else if (fnName === 'search_local_trends') toolResult = await searchTools.search_local_trends(fnArgs);
                     else if (fnName === 'scrape_website') toolResult = await searchTools.scrape_website(fnArgs);
