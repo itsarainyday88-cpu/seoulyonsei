@@ -475,10 +475,12 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
     // [Final Queue] 1.5 완전 배제 & 스크린샷 텍스트용 모델만 엄선
     const modelQueue = [
-        'gemini-2.0-flash',
-        'gemini-2.0-flash-exp',
-        'gemini-1.5-pro',
-        'gemini-1.5-flash',
+        'gemini-3.1-pro-preview',
+        'gemini-3-pro-preview',
+        'gemini-3-flash-preview',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash'
     ];
 
     let lastError: any = null;
