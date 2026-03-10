@@ -594,8 +594,8 @@ export default function ChatInterface() {
                                                         });
                                                         const { id } = await res.json();
                                                         // Electron URL Click 방식을 우회하여 메인 앱 상태를 유지하며 외부 브라우저로 띄움
-                                                        if ((window as any).electronAPI) {
-                                                            (window as any).electronAPI.send('open-external', `${window.location.origin}/handoff?id=${id}`);
+                                                        if ((window as any).electron) {
+                                                            (window as any).electron.openExternal(`${window.location.origin}/handoff?id=${id}`);
                                                         } else {
                                                             window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
                                                         }
@@ -715,8 +715,8 @@ export default function ChatInterface() {
                                                             body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_INSTA', data: { caption: cleanCaption, blocks: blocks } })
                                                         });
                                                         const { id } = await res.json();
-                                                        if ((window as any).electronAPI) {
-                                                            (window as any).electronAPI.send('open-external', `${window.location.origin}/handoff?id=${id}`);
+                                                        if ((window as any).electron) {
+                                                            (window as any).electron.openExternal(`${window.location.origin}/handoff?id=${id}`);
                                                         } else {
                                                             window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
                                                         }
