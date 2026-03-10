@@ -56,16 +56,27 @@ let NEXT_URL = `http://localhost:${NEXT_PORT}`;
 let mainWindow: BrowserWindow | null = null;
 let nextServerProcess: ChildProcess | null = null;
 
-function getFreePort(): Promise<number> {
-    return new Promise((resolve, reject) => {
-        const srv = net.createServer();
-        srv.unref();
-        srv.on('error', reject);
-        srv.listen(0, () => {
-            const port = (srv.address() as net.AddressInfo).port;
-            srv.close(() => resolve(port));
-        });
-    });
+function killPortSync(port: number) {
+    try {
+        const { execSync } = require('child_process');
+        // Find PID listening on the port
+        const output = execSync(`netstat -ano | findstr :${port}`).toString();
+        const lines = output.split('\n');
+        for (const line of lines) {
+            if (line.includes(`:${port}`) && line.includes('LISTENING')) {
+                const parts = line.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (pid && pid !== '0') {
+                    console.log(`Killing process ${pid} using port ${port}`);
+                    // Force kill the process tree
+                    execSync(`taskkill /PID ${pid} /F /T`);
+                }
+            }
+        }
+    } catch (e) {
+        // Ignore errors if no process found or taskkill fails
+        console.log(`No process found listening on port ${port} or failed to kill.`);
+    }
 }
 
 function createWindow(): void {
@@ -141,13 +152,15 @@ function waitForNextServer(url: string, timeout = 30000): Promise<void> {
 
 app.whenReady().then(async () => {
     if (!isDev) {
-        // [Stage 2: Dynamic Port Allocation]
+        // [Stage 2: Fixed Port Allocation]
+        // Faire Click chrome extension expects port 3000 exactly. Dynamic port breaks it.
         try {
-            NEXT_PORT = await getFreePort();
-            NEXT_URL = `http://localhost:${NEXT_PORT}`;
+            killPortSync(3000); // Force free the port if a zombie process is holding it
         } catch (e) {
-            console.error('Failed to get free port, fallback to 3000', e);
+            console.error('kill port error', e);
         }
+        NEXT_PORT = 3000;
+        NEXT_URL = `http://localhost:${NEXT_PORT}`;
 
         const { spawn } = await import('child_process');
         const serverPath = path.join(process.resourcesPath, 'app', 'server.js');
