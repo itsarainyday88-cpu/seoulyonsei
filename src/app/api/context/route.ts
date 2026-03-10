@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
-// Context storage directory: AppData/SeoulYonseiAdminOS/context/
-const getContextDir = () => {
-    // [🚨 Web-Lite Optimization] Skip FS check on Web
-    if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') return null;
-
-    const base = process.env.APPDATA || (os && typeof os.homedir === 'function' ? os.homedir() : '/tmp');
-    const dir = path.join(base, 'SeoulYonseiAdminOS', 'context');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    return dir;
-};
+// [🚨 Web-Lite Optimization] Totally avoid importing 'fs', 'path', 'os' at the top level
+// to prevent Vercel/Edge runtime from crashing due to restricted module access.
 
 const today = () => new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
@@ -23,11 +12,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'agentId and content required' }, { status: 400 });
         }
 
-        const dir = getContextDir();
-        if (!dir) {
-            console.log('[Context] Lite mode: skipping local save');
+        // Check mode first
+        if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+            console.log('[Context] Lite mode: skipping local save (no FS hit)');
             return NextResponse.json({ ok: true });
         }
+
+        // If NOT lite (local dev), we dynamically import to prevent top-level crash
+        const fs = await import('fs');
+        const path = await import('path');
+        const os = await import('os');
+
+        const base = process.env.APPDATA || os.homedir();
+        const dir = path.join(base, 'SeoulYonseiAdminOS', 'context');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
         const filePath = path.join(dir, `${agentId}_${today()}.json`);
 
@@ -40,7 +38,9 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ ok: true });
     } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+        console.error('[Context API Error]', e.message);
+        // Fail silently for context saving to not interrupt chat
+        return NextResponse.json({ ok: false, error: e.message });
     }
 }
 
@@ -48,15 +48,20 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const agentId = searchParams.get('agentId');
-        if (!agentId) return NextResponse.json({ context: null });
+        if (!agentId || process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+            return NextResponse.json({ context: null });
+        }
 
-        const dir = getContextDir();
-        if (!dir) return NextResponse.json({ context: null });
+        const fs = await import('fs');
+        const path = await import('path');
+        const os = await import('os');
 
+        const base = process.env.APPDATA || os.homedir();
+        const dir = path.join(base, 'SeoulYonseiAdminOS', 'context');
         const filePath = path.join(dir, `${agentId}_${today()}.json`);
 
         if (!fs.existsSync(filePath)) {
-            return NextResponse.json({ context: null }); // 오늘 날짜 결과 없으면 null
+            return NextResponse.json({ context: null });
         }
 
         const raw = fs.readFileSync(filePath, 'utf-8');
