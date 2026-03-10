@@ -225,15 +225,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             let promptText = match[1].trim().replace(/^[:\s]+/, '').trim();
                             if (promptText && promptText.length > 5) {
                                 try {
-                                    // [🚨 Lite Mode Optimization] 
-                                    // On Vercel, skip slow AI generation and potential 'fs' crash.
-                                    // Directly use Policy Engine's fallback images for instant response.
-                                    if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
-                                        const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
-                                        usedImageUrls.add(fallback);
-                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
-                                        continue;
-                                    }
+
 
                                     // Track used images to prevent duplicates in the same post
                                     const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
@@ -335,13 +327,6 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     let promptText = match[1].trim();
                     if (promptText && promptText.length > 5) {
                         try {
-                            // [🚨 Lite Mode Optimization] 
-                            if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
-                                const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
-                                usedImageUrls.add(fallback);
-                                yield buffer.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`);
-                                return;
-                            }
 
                             const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                             if (imageUrl) {
