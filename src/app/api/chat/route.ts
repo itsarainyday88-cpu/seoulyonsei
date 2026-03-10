@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { generateAgentResponseStream } from '@/lib/gemini';
-
 import { supabase } from '@/lib/supabase';
+
+// @ts-ignore
+declare const process: any;
 
 export async function POST(req: Request) {
     try {

@@ -2,6 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
+// @ts-ignore
+declare const process: any;
+// @ts-ignore
+declare const Buffer: any;
+
 /**
  * Generates an image using Gemini Imagen 3 (Nano Banana Pro) via REST API.
  * Saves the image to public/generated-images and returns the public URL.

@@ -105,7 +105,7 @@ export default function ChatInterface() {
 
         const userMessage = input.trim();
         setInput('');
-        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setMessages((prev: Message[]) => [...prev, { role: 'user', content: userMessage }]);
 
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 10);
 
@@ -116,7 +116,7 @@ export default function ChatInterface() {
         abortControllerRef.current = controller;
 
         try {
-            setMessages(prev => [...prev, { role: 'model', content: '' }]);
+            setMessages((prev: Message[]) => [...prev, { role: 'model', content: '' }]);
 
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 10);
 
@@ -167,7 +167,7 @@ export default function ChatInterface() {
                 const chunk = decoder.decode(value, { stream: true });
                 accumulatedResponse += chunk;
 
-                setMessages(prev => {
+                setMessages((prev: Message[]) => {
                     const newMessages = [...prev];
                     const lastMsg = newMessages[newMessages.length - 1];
                     if (lastMsg.role === 'model') {
@@ -192,7 +192,7 @@ export default function ChatInterface() {
                 return;
             }
             console.error(error);
-            setMessages(prev => {
+            setMessages((prev: Message[]) => {
                 const newMessages = [...prev];
                 const lastMsg = newMessages[newMessages.length - 1];
                 if (lastMsg?.role === 'model') {
@@ -211,7 +211,7 @@ export default function ChatInterface() {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             setLoading(false);
-            setMessages(prev => {
+            setMessages((prev: Message[]) => {
                 const newMessages = [...prev];
                 const lastMsg = newMessages[newMessages.length - 1];
                 if (lastMsg?.role === 'model' && !lastMsg.content) {
