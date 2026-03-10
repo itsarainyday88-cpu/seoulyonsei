@@ -124,13 +124,25 @@ export default function ChatInterface() {
             const searchKeywords = ['검색', '찾아', '조사', 'search', '구글', 'google', '최신', '정보', '가격', '근황'];
             const shouldSearch = searchKeywords.some(keyword => userMessage.toLowerCase().includes(keyword));
 
+            // --- 크로스 에이전트 컨텍스트: Blog/Insta/Threads/Shortform이면 오늘 Marketer 결과 불러오기 ---
+            let contextInjection = '';
+            if (['Blog', 'Insta', 'Threads', 'Shortform'].includes(activeAgent)) {
+                try {
+                    const ctxRes = await fetch('/api/context?agentId=Marketer', { signal: controller.signal });
+                    const ctxData = await ctxRes.json();
+                    if (ctxData.context) {
+                        contextInjection = `\n\n[📋 오늘 마케터 분석 결과 참조]\n${ctxData.context}\n\n위 마케터의 시장 분석/전략 내용을 참고하여 콘텐츠를 작성하세요.`;
+                    }
+                } catch (_) { /* 컨텍스트 없으면 조용히 무시 */ }
+            }
+
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 signal: controller.signal,
                 body: JSON.stringify({
                     agentId: activeAgent,
-                    message: userMessage,
+                    message: userMessage + (contextInjection ? contextInjection : ''),
                     history: messages,
                     useSearch: shouldSearch
                 }),

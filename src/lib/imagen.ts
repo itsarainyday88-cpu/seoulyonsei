@@ -1,5 +1,5 @@
-// [🚨 File System Access] No top-level 'fs' or 'path' to avoid Vercel crash
 import crypto from 'crypto';
+import { supabase } from './supabase';
 
 // @ts-ignore
 declare const process: any;
@@ -106,8 +106,38 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
         }
 
         if (base64Data) {
-            // [🚀 Vercel Optimization] Directly return Base64 to avoid FS issues
-            return `data:image/png;base64,${base64Data}`;
+            // [🚀 Vercel Fix] Upload to Supabase Storage to get a Public URL
+            try {
+                const fileName = `ai_${Date.now()}_${crypto.randomBytes(2).toString('hex')}.png`;
+                const buffer = Buffer.from(base64Data, 'base64');
+
+                // 1. Upload to Supabase ('generated-images' bucket)
+                const { data, error: uploadError } = await supabase.storage
+                    .from('generated-images')
+                    .upload(fileName, buffer, {
+                        contentType: 'image/png',
+                        upsert: true
+                    });
+
+                if (uploadError) {
+                    console.error('[🚨 Supabase Upload Error]', uploadError);
+                    throw uploadError;
+                }
+
+                // 2. Get Public URL
+                const { data: { publicUrl } } = supabase.storage
+                    .from('generated-images')
+                    .getPublicUrl(fileName);
+
+                if (!publicUrl) throw new Error("Failed to generate Public URL from Supabase");
+
+                console.log(`[✅ Cloud Storage] Upload success: ${publicUrl}`);
+                return publicUrl;
+            } catch (storageErr: any) {
+                console.error('[❌ Cloud Storage Failed]', storageErr.message || storageErr);
+                // Last resort: Return Base64 (This will still show in UI, but Insta will fail)
+                return `data:image/png;base64,${base64Data}`;
+            }
         } else {
             const { getFallbackImage } = await import('@/lib/image-policy');
             return getFallbackImage(cleanPrompt, excludedPaths);
