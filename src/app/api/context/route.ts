@@ -5,7 +5,10 @@ import * as os from 'os';
 
 // Context storage directory: AppData/SeoulYonseiAdminOS/context/
 const getContextDir = () => {
-    const base = process.env.APPDATA || os.homedir();
+    // [🚨 Web-Lite Optimization] Skip FS check on Web
+    if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') return null;
+
+    const base = process.env.APPDATA || (os && typeof os.homedir === 'function' ? os.homedir() : '/tmp');
     const dir = path.join(base, 'SeoulYonseiAdminOS', 'context');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return dir;
@@ -21,6 +24,11 @@ export async function POST(req: NextRequest) {
         }
 
         const dir = getContextDir();
+        if (!dir) {
+            console.log('[Context] Lite mode: skipping local save');
+            return NextResponse.json({ ok: true });
+        }
+
         const filePath = path.join(dir, `${agentId}_${today()}.json`);
 
         fs.writeFileSync(filePath, JSON.stringify({
@@ -43,6 +51,8 @@ export async function GET(req: NextRequest) {
         if (!agentId) return NextResponse.json({ context: null });
 
         const dir = getContextDir();
+        if (!dir) return NextResponse.json({ context: null });
+
         const filePath = path.join(dir, `${agentId}_${today()}.json`);
 
         if (!fs.existsSync(filePath)) {
