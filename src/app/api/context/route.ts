@@ -10,13 +10,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'agentId and content required' }, { status: 400 });
         }
 
-        // --- Cloud Sync (Always attempted for Marketer results) ---
+        // --- Cloud Sync (Upsert to prevent duplication) ---
         if (agentId === 'Marketer') {
-            await supabase.from('documents').insert([{
+            const todayStr = today();
+            await supabase.from('documents').upsert({
+                id: `marketer_${todayStr}`, // Fixed ID per day to prevent dups
                 agent_id: 'Marketer',
                 content: content,
                 created_at: new Date().toISOString()
-            }]);
+            }, { onConflict: 'id' });
         }
 
         // Check mode for local persistence

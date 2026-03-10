@@ -242,8 +242,10 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                     // Directly use Policy Engine's fallback images for instant response.
                                     if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
                                         const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
-                                        usedImageUrls.add(fallback);
-                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
+                                        if (fallback) {
+                                            usedImageUrls.add(fallback);
+                                        }
+                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback || '')})\n\n`) + '\n';
                                         continue;
                                     }
 
