@@ -28,8 +28,7 @@ ipcMain.on('open-external', (event, url) => {
     ];
     const chromePath = chromePaths.find(p => fs.existsSync(p));
     if (chromePath) {
-        // Fix Windows cmd.exe quote stripping by wrapping the entire command in quotes
-        exec(`""${chromePath}" "${url}""`);
+        exec(`"${chromePath}" "${url}"`);
     } else {
         shell.openExternal(url);
     }
@@ -109,8 +108,7 @@ function createWindow(): void {
         ];
         const chromePath = chromePaths.find(p => fs.existsSync(p));
         if (chromePath) {
-            // Fix Windows cmd.exe quote stripping by wrapping the entire command in quotes
-            exec(`""${chromePath}" "${url}""`);
+            exec(`"${chromePath}" "${url}"`);
         } else {
             shell.openExternal(url); // Chrome 없으면 기본 브라우저 fallback
         }
