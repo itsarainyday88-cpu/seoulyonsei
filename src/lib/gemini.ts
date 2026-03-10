@@ -63,9 +63,8 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         : history;
 
     const tryStream = async function* (modelName: string, retries = 1) {
-        // Lite 모드에서는 Vercel 10초 타임아웃 방지를 위해 모든 도구(검색, 사고) 비활성화
-        const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
-        let tools: any[] | undefined = [
+        // 모든 에이전트: 커스텀 검색 + 사고(Thinking) 도구 활성화
+        let tools: any[] = [
             {
                 functionDeclarations: [
                     ...searchToolDefinitions[0].functionDeclarations,
@@ -74,11 +73,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             }
         ];
 
-        if (isLite) {
-            tools = undefined; // 원장님, 웹 버전은 구글 검색 시간조차 아껴야 10초 안에 답변이 나옵니다.
-        }
-
-        console.log(`[Tool] ${isLite ? 'Disabled (Lite-Turbo)' : 'Search + Thinking'} Enabled on ${modelName}`);
+        console.log(`[Tool] Search + Thinking Tools Enabled on ${modelName}`);
 
         const todayContext = getTodayContext();
         let systemInstruction = getSystemInstruction(agentId, todayContext, message);
@@ -476,15 +471,13 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         }
     };
 
-    // [Final Queue] 2026.03.10 최신 상용 모델 반영 (Gemini 3.1 시리즈 적용)
-    const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
-    const modelQueue = isLite ? [
-        'gemini-3.1-flash-lite', // 현존 최강 속도
-        'gemini-3.1-pro',
-        'gemini-2.0-flash'
-    ] : [
-        'gemini-3.1-pro',       // 최고 지능
-        'gemini-3.1-flash-lite',
+    // [Final Queue] 원장님 원래 설정 모델 리스트 (지능 중심)
+    const modelQueue = [
+        'gemini-3.1-pro-preview',
+        'gemini-3-pro-preview',
+        'gemini-3-flash-preview',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
         'gemini-2.0-flash'
     ];
 
