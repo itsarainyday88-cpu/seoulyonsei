@@ -5,6 +5,9 @@ import { supabase } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+    if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+        return NextResponse.json({ error: 'File upload is disabled in Lite mode' }, { status: 501 });
+    }
     try {
         const formData = await req.formData();
         const file = formData.get('file') as File;

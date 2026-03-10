@@ -332,6 +332,10 @@ export default function ChatInterface() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+            alert('웹 버전(Lite)에서는 성능 최적화를 위해 파일 업로드가 비활성화되어 있습니다. 데스크탑 앱을 사용해 주세요.');
+            return;
+        }
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
@@ -834,14 +838,16 @@ export default function ChatInterface() {
                         multiple
                         accept=".pdf,.txt,.md,.pptx,.docx,.xlsx,.png,.jpg,.jpeg,.webp,.csv"
                     />
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-3 text-gray-400 hover:text-primary transition-all rounded-xl hover:bg-secondary/20 flex flex-col items-center gap-1 min-w-[60px]"
-                        title="파일 업로드 (PDF/Text)"
-                    >
-                        <Paperclip className="w-5 h-5" />
-                        <span className="text-[10px] font-bold">파일 첨부</span>
-                    </button>
+                    {process.env.NEXT_PUBLIC_APP_MODE !== 'lite' && (
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-3 text-gray-400 hover:text-primary transition-all rounded-xl hover:bg-secondary/20 flex flex-col items-center gap-1 min-w-[60px]"
+                            title="파일 업로드 (PDF/Text)"
+                        >
+                            <Paperclip className="w-5 h-5" />
+                            <span className="text-[10px] font-bold">파일 첨부</span>
+                        </button>
+                    )}
 
                     {attachments.length > 0 && (
                         <div className="absolute bottom-full left-0 mb-4 flex flex-wrap gap-3 w-full px-2 max-h-48 overflow-y-auto pb-4 scrollbar-none">

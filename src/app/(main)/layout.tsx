@@ -101,7 +101,15 @@ function Sidebar() {
                     className="text-left group hover:opacity-70 transition-opacity"
                     title="새로고침 (초기화)"
                 >
-                    <h1 className="text-2xl font-serif font-bold text-secondary">서울연세학원 마케팅 OS</h1>
+                    <div className="flex flex-col gap-0.5">
+                        <h1 className="text-lg font-black tracking-tight text-secondary">서울연세 <span className="text-primary font-black">MARKETING OS</span></h1>
+                        {process.env.NEXT_PUBLIC_APP_MODE === 'lite' && (
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-full w-fit">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                <span>WEB-LITE ACTIVE</span>
+                            </div>
+                        )}
+                    </div>
                     <p className="text-xs text-secondary/60 tracking-wider">Academy Growth Solution</p>
                 </button>
             </div>
