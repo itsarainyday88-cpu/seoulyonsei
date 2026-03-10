@@ -18,7 +18,9 @@ import {
     Code,
     TrendingUp,
     Menu,
-    Video
+    Video,
+    CheckCircle,
+    ExternalLink
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AgentProvider, useAgent } from '@/context/AgentContext';
@@ -73,12 +75,11 @@ function Sidebar() {
     };
 
     const agents = [
-        { id: 'Blog', name: 'Blog', role: '원장 직강 전문 라이터', icon: FileText, desc: '국어/수학 전문 칼럼니스트 및 블로그 컨텐츠 제작' },
-        { id: 'Insta', name: 'Insta', role: '학원 비주얼 디렉터', icon: Instagram, desc: '수강생 모집/학원 전경 중심의 카드뉴스 기획 및 프롬프트 생성' },
-        { id: 'Threads', name: 'Threads', role: '스레드 디렉터', icon: Share2, desc: '지적 통찰력 중심의 짧고 강렬한 텍스트 타래(타이포) 기획' },
-        { id: 'Shortform', name: 'Shortform', role: '숏폼/릴스 디렉터', icon: Video, desc: '릴스, 쇼츠 전용 고밀도 대본 및 연출 가이드 생성' },
-        { id: 'Reputation', name: 'Reputation', role: '수강 후기 관리자', icon: ShieldAlert, desc: '학원/강의 리뷰에 대한 맞춤형 답변 생성' },
-        { id: 'Marketer', name: 'Marketer', role: '전략가 + 감시관', icon: TrendingUp, desc: '경쟁 학원 동향 분석 및 학원법/광고법 리스크 감시' },
+        { id: 'Blog', name: 'Blog', role: '원장 직강 전문 라이터', icon: FileText, color: 'text-green-600', bg: 'bg-green-50', desc: '국어/수학 전문 칼럼니스트 및 블로그 컨텐츠 제작' },
+        { id: 'Insta', name: 'Insta', role: '학원 비주얼 디렉터', icon: Instagram, color: 'text-pink-600', bg: 'bg-pink-50', desc: '수강생 모집/학원 전경 중심의 카드뉴스 기획 및 프롬프트 생성' },
+        { id: 'Threads', name: 'Threads', role: '스레드 디렉터', icon: Share2, color: 'text-slate-900', bg: 'bg-slate-100', desc: '지적 통찰력 중심의 짧고 강렬한 텍스트 타래(타이포) 기획' },
+        { id: 'Shortform', name: 'Shortform', role: '숏폼/릴스 디렉터', icon: Video, color: 'text-purple-600', bg: 'bg-purple-50', desc: '릴스, 쇼츠 전용 고밀도 대본 및 연출 가이드 생성' },
+        { id: 'Marketer', name: 'Marketer', role: '전략가 + 감시관', icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50', desc: '경쟁 학원 동향 분석 및 학원법/광고법 리스크 감시' },
     ];
 
     return (
@@ -131,35 +132,95 @@ function Sidebar() {
                     </button>
                 </div>
 
-                <div className={`grid grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ${currentView === 'calendar' ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className={`flex flex-col gap-3 transition-opacity ${currentView !== 'chat' ? 'opacity-40 pointer-events-none' : ''}`}>
                     {agents.map((agent) => (
                         <button
                             key={agent.id}
                             onClick={() => setActiveAgent(agent.id as any)}
-                            className={`p-4 rounded-xl border transition-all text-left group relative flex flex-col gap-3 hover:z-20
+                            className={`flex items-center gap-5 p-5 rounded-2xl border transition-all text-left group relative
                                 ${activeAgent === agent.id
-                                    ? 'bg-secondary text-primary border-secondary shadow-lg scale-[1.02]'
-                                    : 'bg-white border-sand/40 hover:border-secondary/50 hover:shadow-md text-foreground'
+                                    ? 'bg-secondary text-primary border-secondary shadow-xl scale-[1.02] ring-4 ring-secondary/10'
+                                    : 'bg-white border-sand/40 hover:border-secondary/50 hover:bg-sand/5 text-foreground shadow-sm'
                                 }
                             `}
                         >
-                            <div className={`p-2 rounded-lg w-fit ${activeAgent === agent.id ? 'bg-white/10' : 'bg-sand/20'}`}>
-                                <agent.icon className="w-5 h-5" />
+                            <div className={`p-3 rounded-xl shrink-0 transition-colors shadow-inner
+                                ${activeAgent === agent.id ? 'bg-white/20' : `${agent.bg} ${agent.color}`} `}>
+                                <agent.icon className="w-6 h-6" />
                             </div>
-                            <div>
-                                <h3 className="font-bold text-lg leading-tight">{agent.name}</h3>
-                                <p className={`text-xs mt-1 ${activeAgent === agent.id ? 'text-primary/70' : 'text-foreground/60'}`}>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                    <h3 className="font-black text-[17px] tracking-tight leading-tight">{agent.name}</h3>
+                                    {activeAgent === agent.id && (
+                                        <div className="flex gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                        </div>
+                                    )}
+                                </div>
+                                <p className={`text-[12px] font-medium mt-1.5 truncate ${activeAgent === agent.id ? 'text-primary/90' : 'text-foreground/40'}`}>
                                     {agent.role}
                                 </p>
-                            </div>
-
-                            {/* Hover Tooltip */}
-                            <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none shadow-lg w-full text-center leading-tight">
-                                {agent.desc}
                             </div>
                         </button>
                     ))}
                 </div>
+
+                {/* 🛡️ Strategy Status Dashboard Box */}
+                {currentView === 'chat' && (
+                    <div className="mt-10 p-5 rounded-2xl bg-secondary/5 border border-secondary/20 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-[11px] font-black text-secondary/60 uppercase tracking-widest flex items-center gap-2">
+                                <Code className="w-3 h-3" /> System Status
+                            </h4>
+                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">READY</span>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-foreground/50 font-medium">Phase 1 Insight</span>
+                                <span className="text-secondary font-bold flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3 text-green-500" /> Synced
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-foreground/50 font-medium">Legal Filter</span>
+                                <span className="text-secondary font-bold flex items-center gap-1 text-[10px]">ACTIVE</span>
+                            </div>
+                            <div className="pt-2 border-t border-secondary/10">
+                                <p className="text-[10px] text-foreground/40 leading-relaxed italic">
+                                    "독보적인 지적 자산을 모든 플랫폼에 일관되게 동기화 중입니다."
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* 🔌 Faire Click Extension Helper */}
+                {currentView === 'chat' && (
+                    <div className="mt-4 p-5 rounded-2xl bg-primary/10 border border-primary/20 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-[11px] font-black text-primary/60 uppercase tracking-widest flex items-center gap-2">
+                                <Share2 className="w-3 h-3" /> Faire Click Extension
+                            </h4>
+                        </div>
+                        <p className="text-[10px] text-foreground/50 leading-relaxed font-medium">
+                            브라우저에서 직접 글을 작성하려면 확장 프로그램 설치가 필요합니다.
+                        </p>
+                        <button
+                            onClick={() => {
+                                const url = 'https://chromewebstore.google.com/detail/kfldgophlmpejmlgjapbbnemnkdffobo';
+                                if ((window as any).electron) {
+                                    (window as any).electron.openExternal(url);
+                                } else {
+                                    window.open(url, '_blank');
+                                }
+                            }}
+                            className="w-full flex items-center justify-between bg-white/60 hover:bg-white p-2.5 rounded-xl border border-primary/10 transition-all group"
+                        >
+                            <span className="text-[11px] font-bold text-secondary">Chrome에 추가하기</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-secondary/40 group-hover:text-secondary" />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="p-6 border-t border-sand/30 bg-white/30">

@@ -38,6 +38,21 @@ const path = __importStar(require("path"));
 const http = __importStar(require("http"));
 const fs = __importStar(require("fs"));
 const child_process_1 = require("child_process");
+// --- IPC Listeners ---
+electron_1.ipcMain.on('open-external', (event, url) => {
+    const chromePaths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
+    ];
+    const chromePath = chromePaths.find(p => fs.existsSync(p));
+    if (chromePath) {
+        (0, child_process_1.exec)(`"${chromePath}" "${url}"`);
+    }
+    else {
+        electron_1.shell.openExternal(url);
+    }
+});
 // --- Load config.txt (customer-editable settings) ---
 const configPath = path.join(path.dirname(electron_1.app.getPath('exe')), 'config.txt');
 const fallbackConfigPath = path.join(__dirname, '..', 'config.txt');
@@ -129,10 +144,25 @@ function waitForNextServer(url, timeout = 30000) {
 electron_1.app.whenReady().then(async () => {
     if (!isDev) {
         const { spawn } = await Promise.resolve().then(() => __importStar(require('child_process')));
-        const serverPath = path.join(process.resourcesPath, 'app', '.next', 'standalone', 'server.js');
+        const serverPath = path.join(process.resourcesPath, 'app', 'server.js');
+        const logPath = path.join(path.dirname(electron_1.app.getPath('exe')), 'server_log.txt');
+        const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+        logStream.write(`\n--- Server Start Attempt: ${new Date().toISOString()} ---\n`);
+        logStream.write(`Server Path: ${serverPath}\n`);
         const server = spawn('node', [serverPath], {
             env: { ...process.env, PORT: String(NEXT_PORT) },
-            stdio: 'ignore',
+            stdio: ['ignore', 'pipe', 'pipe'],
+            cwd: path.dirname(serverPath),
+        });
+        server.stdout?.on('data', (data) => {
+            logStream.write(`[STDOUT] ${data}\n`);
+        });
+        server.stderr?.on('data', (data) => {
+            logStream.write(`[STDERR] ${data}\n`);
+            console.error(`Next.js server error: ${data}`);
+        });
+        server.on('error', (err) => {
+            logStream.write(`[ERROR] Failed to start server: ${err.message}\n`);
         });
         server.unref();
     }

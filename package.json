@@ -22,7 +22,6 @@
     },
     "files": [
       "dist-electron/**/*",
-      "node_modules/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -37,8 +36,13 @@
       {
         "from": "public",
         "to": "app/public"
+      },
+      {
+        "from": "C:/Users/Bijou/.gemini/Hames/Faire_Click",
+        "to": "extension"
       }
     ],
+    "asar": false,
     "win": {
       "target": [
         {
