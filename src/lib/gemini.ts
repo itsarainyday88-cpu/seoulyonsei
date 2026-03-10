@@ -63,18 +63,22 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         : history;
 
     const tryStream = async function* (modelName: string, retries = 1) {
-        // Lite 모드에서는 Vercel 10초 타임아웃 방지를 위해 검색 도구 제외
+        // Lite 모드에서는 Vercel 10초 타임아웃 방지를 위해 모든 도구(검색, 사고) 비활성화
         const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
-        let tools: any[] = [
+        let tools: any[] | undefined = [
             {
                 functionDeclarations: [
-                    ...(isLite ? [] : searchToolDefinitions[0].functionDeclarations),
+                    ...searchToolDefinitions[0].functionDeclarations,
                     ...thinkingToolDefinitions[0].functionDeclarations,
                 ]
             }
         ];
 
-        console.log(`[Tool] ${isLite ? 'Thinking (Lite)' : 'Search + Thinking'} Tools Enabled for all agents on ${modelName}`);
+        if (isLite) {
+            tools = undefined; // 웹 버전에서는 도구 호출 시간조차 아껴야 합니다.
+        }
+
+        console.log(`[Tool] ${isLite ? 'Disabled (Lite-Turbo)' : 'Search + Thinking'} Enabled on ${modelName}`);
 
         const todayContext = getTodayContext();
         let systemInstruction = getSystemInstruction(agentId, todayContext, message);
@@ -472,8 +476,14 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         }
     };
 
-    // [Final Queue] 1.5 완전 배제 & 스크린샷 텍스트용 모델만 엄선
-    const modelQueue = [
+    // [Final Queue] Lite 모드는 속도 중심(Flash 우선), Desktop은 지능 중심(Pro 우선)
+    const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
+    const modelQueue = isLite ? [
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-3.1-pro-preview',
+        'gemini-3-pro-preview',
+    ] : [
         'gemini-3.1-pro-preview',
         'gemini-3-pro-preview',
         'gemini-3-flash-preview',
