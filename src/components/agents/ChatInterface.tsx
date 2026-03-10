@@ -357,7 +357,8 @@ export default function ChatInterface() {
                                                 rehypeRaw,
                                                 [rehypeSanitize, {
                                                     protocols: {
-                                                        href: ['http', 'https', 'mailto', 'tel']
+                                                        href: ['http', 'https', 'mailto', 'tel'],
+                                                        src: ['http', 'https', 'data']
                                                     }
                                                 }]
                                             ]}

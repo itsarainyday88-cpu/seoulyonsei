@@ -244,11 +244,17 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                                         usedImageUrls.add(imageUrl);
                                         // If it's a data URL (Base64), it came from AI generation in lite mode
                                         const label = imageUrl.startsWith('data:') ? 'AI 실시간 생성' : 'AI 생성 이미지';
-                                        yield line.replace(fullMatch, `\n\n![${label}](${encodeURI(imageUrl)})\n\n`) + '\n';
+
+                                        // CRITICAL: Don't encodeURI for data URLs as it can corrupt the base64 format.
+                                        // But keep it for local paths which may have spaces.
+                                        const finalUrl = imageUrl.startsWith('data:') ? imageUrl : encodeURI(imageUrl);
+                                        yield line.replace(fullMatch, `\n\n![${label}](${finalUrl})\n\n`) + '\n';
                                     } else {
                                         const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
-                                        usedImageUrls.add(fallback);
-                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})` + '\n\n') + '\n';
+                                        if (fallback) {
+                                            usedImageUrls.add(fallback);
+                                            yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
+                                        }
                                     }
 
                                     continue; // Fixed: Processed by the [🚨 Image Generation] block above.
