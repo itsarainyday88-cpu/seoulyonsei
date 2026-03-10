@@ -128,6 +128,12 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
 
         // If successful, save file
         if (base64Data) {
+            // [🚨 Web-Lite Optimization] Skip local file writing on Vercel/Web
+            if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+                console.log('[Imagen] Web-Lite: Returning Base64 data directly to avoid FS error');
+                return `data:image/png;base64,${base64Data}`;
+            }
+
             const buffer = Buffer.from(base64Data, 'base64');
             const publicDir = path.join(process.cwd(), 'public', 'generated-images');
             if (!fs.existsSync(publicDir)) {
