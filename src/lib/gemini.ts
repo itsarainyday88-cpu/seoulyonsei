@@ -237,30 +237,21 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             let promptText = match[1].trim().replace(/^[:\s]+/, '').trim();
                             if (promptText && promptText.length > 5) {
                                 try {
-                                    // [🚨 Lite Mode Optimization] 
-                                    // On Vercel, skip slow AI generation and potential 'fs' crash.
-                                    // Directly use Policy Engine's fallback images for instant response.
-                                    if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
-                                        const excluded = Array.from(usedImageUrls);
-                                        const fallback = await getFallbackImageAsync(promptText, excluded);
-                                        if (fallback) {
-                                            usedImageUrls.add(fallback);
-                                            console.log(`[Lite Image Fix] Chosen: ${fallback}, Total Used: ${usedImageUrls.size}`);
-                                        }
-                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback || '')})\n\n`) + '\n';
-                                        continue;
-                                    }
-
-                                    // Track used images to prevent duplicates in the same post
+                                    // [🚨 Image Generation] Attempt real-time generation (Imagen 3/4)
+                                    // The generateAndSaveImage function now handles 'lite' mode safely by returning Base64.
                                     const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                                     if (imageUrl) {
                                         usedImageUrls.add(imageUrl);
-                                        yield line.replace(fullMatch, `\n\n![AI 생성 이미지](${encodeURI(imageUrl)})\n\n`) + '\n';
+                                        // If it's a data URL (Base64), it came from AI generation in lite mode
+                                        const label = imageUrl.startsWith('data:') ? 'AI 실시간 생성' : 'AI 생성 이미지';
+                                        yield line.replace(fullMatch, `\n\n![${label}](${encodeURI(imageUrl)})\n\n`) + '\n';
                                     } else {
                                         const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                                         usedImageUrls.add(fallback);
-                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
+                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})` + '\n\n') + '\n';
                                     }
+
+                                    continue; // Fixed: Processed by the [🚨 Image Generation] block above.
                                 } catch (err) {
                                     const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
                                     usedImageUrls.add(fallback);

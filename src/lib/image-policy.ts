@@ -74,9 +74,9 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
         const selected = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
         if (selected) {
             return {
-                shouldGenerate: false,
+                shouldGenerate: true, // [🚨 User Request] Prefer AI generation even for facilities
                 selectedImagePath: selected.path,
-                reason: `Real facility asset matched for tag: ${facilityTag}`
+                reason: `Facility hint found for ${facilityTag}, but allowing AI generation for variety.`
             };
         }
     }
