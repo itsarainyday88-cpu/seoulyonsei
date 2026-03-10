@@ -476,14 +476,9 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         'gemini-3.1-pro-preview',
         'gemini-3-pro-preview',
         'gemini-3-flash-preview',
-        'gemini-2.0-flash-exp', // Added stable experimental 2.0
-        'gemini-2.0-flash',
-        'gemini-1.5-pro-002',   // Added stable 1.5 Pro
-        'gemini-1.5-pro',
-        'gemini-1.5-flash-002', // Added stable 1.5 Flash
-        'gemini-1.5-flash',
         'gemini-2.5-pro',
-        'gemini-2.5-flash'
+        'gemini-2.5-flash',
+        'gemini-2.0-flash'
     ];
 
     let lastError: any = null;
