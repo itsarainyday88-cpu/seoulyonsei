@@ -227,6 +227,16 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                             let promptText = match[1].trim().replace(/^[:\s]+/, '').trim();
                             if (promptText && promptText.length > 5) {
                                 try {
+                                    // [🚨 Lite Mode Optimization] 
+                                    // On Vercel, skip slow AI generation and potential 'fs' crash.
+                                    // Directly use Policy Engine's fallback images for instant response.
+                                    if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+                                        const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
+                                        usedImageUrls.add(fallback);
+                                        yield line.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`) + '\n';
+                                        continue;
+                                    }
+
                                     // Track used images to prevent duplicates in the same post
                                     const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                                     if (imageUrl) {
@@ -327,6 +337,14 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     let promptText = match[1].trim();
                     if (promptText && promptText.length > 5) {
                         try {
+                            // [🚨 Lite Mode Optimization] 
+                            if (process.env.NEXT_PUBLIC_APP_MODE === 'lite') {
+                                const fallback = await getFallbackImageAsync(promptText, Array.from(usedImageUrls));
+                                usedImageUrls.add(fallback);
+                                yield buffer.replace(fullMatch, `\n\n![학원 이미지](${encodeURI(fallback)})\n\n`);
+                                return;
+                            }
+
                             const imageUrl = await generateAndSaveImage(promptText, Array.from(usedImageUrls));
                             if (imageUrl) {
                                 usedImageUrls.add(imageUrl);
@@ -457,12 +475,10 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
     // [Final Queue] 1.5 완전 배제 & 스크린샷 텍스트용 모델만 엄선
     const modelQueue = [
-        'gemini-3.1-pro-preview',
-        'gemini-3-pro-preview',
-        'gemini-3-flash-preview',
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash'
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-exp',
+        'gemini-1.5-pro',
+        'gemini-1.5-flash',
     ];
 
     let lastError: any = null;
