@@ -476,19 +476,15 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         }
     };
 
-    // [Final Queue] Lite 모드는 속도 중심(Flash 우선), Desktop은 지능 중심(Pro 우선)
+    // [Final Queue] 2026.03.10 최신 상용 모델 반영 (Gemini 3.1 시리즈 적용)
     const isLite = process.env.NEXT_PUBLIC_APP_MODE === 'lite';
     const modelQueue = isLite ? [
-        'gemini-3.0-flash',
-        'gemini-3.1-pro-preview',
-        'gemini-3-pro-preview',
-        'gemini-2.0-flash',
+        'gemini-3.1-flash-lite', // 현존 최강 속도
+        'gemini-3.1-pro',
+        'gemini-2.0-flash'
     ] : [
-        'gemini-3.1-pro-preview',
-        'gemini-3-pro-preview',
-        'gemini-3-flash-preview',
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
+        'gemini-3.1-pro',       // 최고 지능
+        'gemini-3.1-flash-lite',
         'gemini-2.0-flash'
     ];
 
