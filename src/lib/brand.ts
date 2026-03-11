@@ -6,18 +6,18 @@ export const BRAND = {
 
     // Contact Info (Editable by User)
     contact: {
-        address: "경기 성남시 수정구 수정로 108 2, 3층 (태평동)",
-        phone: "031-8039-6543",
-        hours: "월/수 야간진료 (~20:30), 토요일 진료 (~14:00)",
-        parking: "성남중앙공설시장 주차빌딩 이용"
+        address: "경기도 김포시 김포한강1로 247 5층 511호 (헤리움타운)",
+        phone: "010-9625-5009",
+        hours: "평일 14:00 - 22:00, 주말/공휴일 휴무",
+        parking: "건물 내 주차 가능"
     },
 
     // Brand Identity for AI Agents
     identity: {
-        industry: "Education", // e.g. "Dental", "Plastic Surgery", "Law Firm"
-        coreValues: ["Elegance", "Trust", "Perfection"],
-        targetAudience: "High-net-worth individuals, Professionals",
-        toneOfVoice: "Logical, Professional, Trustworthy"
+        industry: "Education (Premium Academy)", // e.g. "Dental", "Plastic Surgery", "Law Firm"
+        coreValues: ["Excellence", "Trust", "Logical Perfection"],
+        targetAudience: "High-net-worth parents, Top 1% students",
+        toneOfVoice: "Logical, Professional, Trustworthy, Authoritative"
     },
 
     // Theme Colors
