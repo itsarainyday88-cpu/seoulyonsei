@@ -38,7 +38,6 @@ const path = __importStar(require("path"));
 const http = __importStar(require("http"));
 const fs = __importStar(require("fs"));
 const child_process_1 = require("child_process");
-const net = __importStar(require("net"));
 // --- Single Instance Lock ---
 const gotTheLock = electron_1.app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -89,16 +88,28 @@ let NEXT_PORT = 3000;
 let NEXT_URL = `http://localhost:${NEXT_PORT}`;
 let mainWindow = null;
 let nextServerProcess = null;
-function getFreePort() {
-    return new Promise((resolve, reject) => {
-        const srv = net.createServer();
-        srv.unref();
-        srv.on('error', reject);
-        srv.listen(0, () => {
-            const port = srv.address().port;
-            srv.close(() => resolve(port));
-        });
-    });
+function killPortSync(port) {
+    try {
+        const { execSync } = require('child_process');
+        // Find PID listening on the port
+        const output = execSync(`netstat -ano | findstr :${port}`).toString();
+        const lines = output.split('\n');
+        for (const line of lines) {
+            if (line.includes(`:${port}`) && line.includes('LISTENING')) {
+                const parts = line.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (pid && pid !== '0') {
+                    console.log(`Killing process ${pid} using port ${port}`);
+                    // Force kill the process tree
+                    execSync(`taskkill /PID ${pid} /F /T`);
+                }
+            }
+        }
+    }
+    catch (e) {
+        // Ignore errors if no process found or taskkill fails
+        console.log(`No process found listening on port ${port} or failed to kill.`);
+    }
 }
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -171,14 +182,16 @@ function waitForNextServer(url, timeout = 30000) {
 }
 electron_1.app.whenReady().then(async () => {
     if (!isDev) {
-        // [Stage 2: Dynamic Port Allocation]
+        // [Stage 2: Fixed Port Allocation]
+        // Faire Click chrome extension expects port 3000 exactly. Dynamic port breaks it.
         try {
-            NEXT_PORT = await getFreePort();
-            NEXT_URL = `http://localhost:${NEXT_PORT}`;
+            killPortSync(3000); // Force free the port if a zombie process is holding it
         }
         catch (e) {
-            console.error('Failed to get free port, fallback to 3000', e);
+            console.error('kill port error', e);
         }
+        NEXT_PORT = 3000;
+        NEXT_URL = `http://localhost:${NEXT_PORT}`;
         const { spawn } = await Promise.resolve().then(() => __importStar(require('child_process')));
         const serverPath = path.join(process.resourcesPath, 'app', 'server.js');
         const logPath = path.join(path.dirname(electron_1.app.getPath('exe')), 'server_log.txt');

@@ -21,7 +21,7 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
 } {
     const p = prompt.toLowerCase();
 
-    // 0. 강제 생성 백도어 (FORCE_GENERATE) - 특정 태그가 있으면 모든 검열을 무시하고 통과
+    // 0. 강제 생성 백도어 (FORCE_GENERATE)
     if (p.includes('[force_generate]')) {
         return {
             shouldGenerate: true,
@@ -29,55 +29,62 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
         };
     }
 
-    // 1. 강사/원장님 관련 키워드 (PEOPLE)
-    if (p.includes('원장') || p.includes('선생님') || p.includes('강사') || p.includes('lecturer') || p.includes('teacher') || p.includes('director')) {
+    // 1. 강사/원장님 관련 키워드 (PEOPLE) - '브랜드 핵심 키워드'만 실사 매칭
+    const highIntentKeywords = [
+        '원장', '백성현', '이주연', '변호사', '치과', '서울대', '연세대', 
+        '0.5%', 'directors', 'lawyer', 'dentist'
+    ];
+
+    // 키워드가 포함되어 있고, 70%의 확률로 실사 사진 선택 (30%는 AI의 창의적 연출을 위해 양보)
+    if (highIntentKeywords.some(k => p.includes(k)) && Math.random() < 0.7) {
         let tag: ImageTag = 'group';
-        if (p.includes('수학') || p.includes('math')) tag = 'math';
-        else if (p.includes('국어') || p.includes('korean')) tag = 'korean';
-        else if (p.includes('부부') || p.includes('두 분') || p.includes('원장님들')) tag = 'directors';
+        
+        if (p.includes('수학') || p.includes('math') || p.includes('치과') || p.includes('0.5%')) tag = 'math';
+        else if (p.includes('국어') || p.includes('korean') || p.includes('변호사') || p.includes('서울대')) tag = 'korean';
+        else if (p.includes('부부') || p.includes('directors')) tag = 'directors';
 
         const filtered = metadata.filter(img =>
             img.category === 'PEOPLE' &&
             img.tag === tag &&
             !excludedPaths.includes(img.path)
         );
-        const selected = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
 
-        return {
-            shouldGenerate: false,
-            selectedImagePath: selected?.path || '/images/directors.webp',
-            reason: `Real lecturer asset matched for tag: ${tag}`
-        };
+        if (filtered.length > 0) {
+            const selected = filtered[Math.floor(Math.random() * filtered.length)];
+            return {
+                shouldGenerate: false,
+                selectedImagePath: selected.path,
+                reason: `Brand specific real asset matched: ${tag}`
+            };
+        }
     }
 
-    // 2. 학원 시설/내부 관련 키워드 (FACILITY) - 태그별로 분리 매칭
-    let facilityTag: string | null = null;
-
-    if (p.includes('외관') || p.includes('외경') || p.includes('건물') || p.includes('exterior') || p.includes('building')) {
-        facilityTag = 'exterior';
-    } else if (p.includes('입구') || p.includes('현관') || p.includes('entrance') || p.includes('entry')) {
-        facilityTag = 'entrance';
-    } else if (p.includes('자습실') || p.includes('독서실') || p.includes('study room') || p.includes('self-study')) {
-        facilityTag = 'study_room';
-    } else if (p.includes('교실') || p.includes('강의실') || p.includes('수업') || p.includes('classroom') || p.includes('lecture room') || p.includes('학원') || p.includes('academy')) {
-        facilityTag = 'classroom';
-    }
-
-    if (facilityTag) {
+    // 2. 학원 시설 (FACILITY) - 명확한 시설 명칭일 때만 실사 매칭
+    const specificFacilityKeywords = ['외관', '외경', '입구', '현관', 'exterior', 'entrance'];
+    
+    if (specificFacilityKeywords.some(k => p.includes(k))) {
+        let facilityTag = p.includes('외') ? 'exterior' : 'entrance';
         const filtered = metadata.filter(img =>
             img.category === 'FACILITY' &&
             img.tag === facilityTag &&
             !excludedPaths.includes(img.path)
         );
-        const selected = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : null;
-        if (selected) {
+        if (filtered.length > 0) {
+            const selected = filtered[Math.floor(Math.random() * filtered.length)];
             return {
                 shouldGenerate: false,
                 selectedImagePath: selected.path,
-                reason: `Real facility asset matched for tag: ${facilityTag}`
+                reason: `Specific facility asset matched: ${facilityTag}`
             };
         }
     }
+
+    // 3. 그 외 '공부하는 학생', '교실 분위기', '열정', '신뢰' 등 추상적/일반적 키워드는 
+    // AI 생성을 기본(Default)으로 하여 다채로운 비주얼을 확보함.
+    return {
+        shouldGenerate: true,
+        reason: 'General atmosphere requested. Preferring AI generation for visual variety.'
+    };
 
     // 3. 로고 관련 (BRANDING)
     if (p.includes('로고') || p.includes('logo')) {
@@ -88,10 +95,10 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
         };
     }
 
-    // 4. 그 외 추상적 키워드는 AI 생성 허용
+    // 4. 그 외 구체적이지 않은 키워드만 AI 생성 허용 (학생 뒷모습 등)
     return {
         shouldGenerate: true,
-        reason: 'Attempting latest AI generation (Imagen 4/Nano) for max variety.'
+        reason: 'No specific real asset match found. Proceeding with AI generation.'
     };
 }
 
@@ -100,5 +107,6 @@ export function getImagePolicy(prompt: string, excludedPaths: string[] = []): {
  */
 export function getFallbackImage(prompt: string, excludedPaths: string[] = []): string {
     const policy = getImagePolicy(prompt, excludedPaths);
-    return policy.selectedImagePath || '/images/lecture_room.jpg';
+    // 폴백 시에도 가급적 실제 존재하는 이미지를 내보냄
+    return policy.selectedImagePath || '/images/lecturers/lec_2인_01.webp';
 }

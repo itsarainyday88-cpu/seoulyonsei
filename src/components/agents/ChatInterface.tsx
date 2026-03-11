@@ -100,6 +100,63 @@ export default function ChatInterface() {
         }
     }, []);
 
+    // Helper to extract specific section for cross-agent handoff (Marketer -> Others)
+    const extractAgentSection = (content: string, targetAgent: string) => {
+        const cleanContent = content.split('🚦')[0].trim();
+        
+        // XML Tags (Priority)
+        const tagMap: Record<string, string> = {
+            'Blog': 'blog_strategy',
+            'Insta': 'insta_strategy',
+            'Shortform': 'shortform_strategy',
+            'Threads': 'threads_strategy'
+        };
+
+        const tag = tagMap[targetAgent];
+        if (tag) {
+            const regex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
+            const match = cleanContent.match(regex);
+            if (match && match[1]) return match[1].trim();
+        }
+
+        // Legacy Markers (Fallback)
+        const markers: Record<string, string[]> = {
+            'Blog': ['[블로그 기획]', '[블로그 컨셉]', '### 블로그'],
+            'Insta': ['[인스타 컨셉]', '[인스타그램 기획]', '### 인스타'],
+            'Shortform': ['[숏폼 기획]', '[쇼츠 기획]', '[쇼츠 대본]', '### 쇼츠', '### 숏폼'],
+            'Threads': ['[스레드 기획]', '[스레드 컨셉]', '### 스레드']
+        };
+
+        const targetMarkers = markers[targetAgent] || [];
+        let sectionStartIdx = -1;
+        let foundMarker = '';
+
+        for (const marker of targetMarkers) {
+            const idx = cleanContent.indexOf(marker);
+            if (idx !== -1) {
+                sectionStartIdx = idx;
+                foundMarker = marker;
+                break;
+            }
+        }
+
+        // If specific section not found, return full clean content
+        if (sectionStartIdx === -1) return cleanContent;
+
+        // Find the start of the *next* agent's section to determine the end of current section
+        const allMarkers = Object.values(markers).flat();
+        let sectionEndIdx = cleanContent.length;
+
+        for (const marker of allMarkers) {
+            const idx = cleanContent.indexOf(marker, sectionStartIdx + foundMarker.length);
+            if (idx !== -1 && idx < sectionEndIdx) {
+                sectionEndIdx = idx;
+            }
+        }
+
+        return cleanContent.substring(sectionStartIdx, sectionEndIdx).trim();
+    };
+
     const handleSend = async () => {
         if (!input.trim() || loading) return;
 
@@ -395,7 +452,9 @@ export default function ChatInterface() {
                             <div className={`p-4 rounded-2xl shadow-sm text-sm prose prose-sm max-w-none 
                                 ${activeAgent === 'Shortform'
                                     ? 'prose-p:my-4 prose-p:leading-8 prose-headings:mb-3 prose-headings:mt-6 prose-ul:my-4 prose-li:my-4 prose-li:leading-8'
-                                    : 'leading-relaxed prose-p:my-2'}
+                                    : activeAgent === 'Threads'
+                                            ? 'leading-[2.5] prose-p:my-8 text-base text-black font-normal tracking-tight'
+                                            : 'leading-relaxed prose-p:my-2'}
                         ${msg.role === 'model'
                                     ? 'bg-white rounded-tl-none border border-sand/30 text-foreground'
                                     : 'bg-secondary rounded-tr-none text-primary'}`}>
@@ -403,12 +462,20 @@ export default function ChatInterface() {
                                     let formattedContent = msg.content;
 
                                     // [🚨 Coding-Level Readability Engine] 
-                                    if (msg.role === 'model' && activeAgent === 'Shortform') {
-                                        formattedContent = formattedContent
-                                            // 1. 모든 한 줄 줄바꿈을 이중 줄바꿈으로 변환 (단락 강제 분리)
-                                            .replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
-                                            // 2. 숫자리스트, 🚦, 오프닝/본문/클로징 키워드 앞에는 삼중 줄바꿈 (확실한 섹션 분리)
-                                            .replace(/\n\s*(\d+\.|🚦|\*\*🚦|\(오프닝\)|\(본문\)|\(클로징\))/g, '\n\n\n$1');
+                                    if (msg.role === 'model') {
+                                        // 1. thinking 블록을 접이식 UI로 변환 (원고 오염 방지)
+                                        formattedContent = formattedContent.replace(
+                                            /```thinking\s*([\s\S]*?)```/g,
+                                            '<details class="bg-gray-50 border border-gray-200 rounded-lg p-2 mb-4 text-[12px] text-gray-500"><summary class="cursor-pointer font-bold flex items-center gap-1">🧠 에이전트 사고 과정 (클릭하여 보기)</summary><div class="mt-2 pl-2 border-l-2 border-gray-300">$1</div></details>'
+                                        );
+
+                                        if (activeAgent === 'Shortform') {
+                                            formattedContent = formattedContent
+                                                // 1. 모든 한 줄 줄바꿈을 이중 줄바꿈으로 변환 (단락 강제 분리)
+                                                .replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
+                                                // 2. 숫자리스트, 🚦, 오프닝/본문/클로징 키워드 앞에는 삼중 줄바꿈 (확실한 섹션 분리)
+                                                .replace(/\n\s*(\d+\.|🚦|\*\*🚦|\(오프닝\)|\(본문\)|\(클로징\))/g, '\n\n\n$1');
+                                        }
                                     }
 
                                     return (
@@ -444,10 +511,10 @@ export default function ChatInterface() {
                                         <>
                                             <button
                                                 onClick={() => {
-                                                    const cleanContent = msg.content.split('🚦')[0].trim();
+                                                    const sectionContent = extractAgentSection(msg.content, 'Blog');
                                                     agentMessagesRef.current.set('Marketer', messages);
                                                     setActiveAgent('Blog');
-                                                    setInput(`아래 마케터 기획안을 바탕으로 네이버 블로그 글을 작성해주세요:\n\n${cleanContent}`);
+                                                    setInput(`아래 마케터 기획안을 바탕으로 네이버 블로그 글을 작성해주세요:\n\n${sectionContent}`);
                                                 }}
                                                 className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
                                             >
@@ -455,10 +522,10 @@ export default function ChatInterface() {
                                             </button>
                                             <button
                                                 onClick={() => {
-                                                    const cleanContent = msg.content.split('🚦')[0].trim();
+                                                    const sectionContent = extractAgentSection(msg.content, 'Insta');
                                                     agentMessagesRef.current.set('Marketer', messages);
                                                     setActiveAgent('Insta');
-                                                    setInput(`아래 마케터 기획안을 바탕으로 인스타그램 게시물을 작성해주세요:\n\n${cleanContent}`);
+                                                    setInput(`아래 마케터 기획안을 바탕으로 인스타그램 게시물을 작성해주세요:\n\n${sectionContent}`);
                                                 }}
                                                 className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-pink-50 text-pink-700 border border-pink-200 rounded-lg hover:bg-pink-100 transition-colors"
                                             >
@@ -466,269 +533,250 @@ export default function ChatInterface() {
                                             </button>
                                             <button
                                                 onClick={() => {
-                                                    const cleanContent = msg.content.split('🚦')[0].trim();
-                                                    agentMessagesRef.current.set('Marketer', messages);
-                                                    setActiveAgent('Shortform');
-                                                    setInput(`아래 마케터 기획안을 바탕으로 숏폼(릴스/쇼츠) 대본을 작성해주세요:\n\n${cleanContent}`);
-                                                }}
-                                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
-                                            >
-                                                🎬 숏폼으로 전달
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    const cleanContent = msg.content.split('🚦')[0].trim();
+                                                    const sectionContent = extractAgentSection(msg.content, 'Threads');
                                                     agentMessagesRef.current.set('Marketer', messages);
                                                     setActiveAgent('Threads');
-                                                    setInput(`아래 마케터 기획안을 바탕으로 스레드(Threads) 타래 글을 작성해주세요:\n\n${cleanContent}`);
+                                                    setInput(`아래 마케터 기획안을 바탕으로 스레드(Threads) 타래 글을 작성해주세요:\n\n${sectionContent}`);
                                                 }}
                                                 className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors"
                                             >
                                                 🧵 스레드로 전달
                                             </button>
+                                            <button
+                                                onClick={() => {
+                                                    const sectionContent = extractAgentSection(msg.content, 'Shortform');
+                                                    agentMessagesRef.current.set('Marketer', messages);
+                                                    setActiveAgent('Shortform');
+                                                    setInput(`아래 마케터 기획안을 바탕으로 숏폼(릴스/쇼츠) 대본을 작성해주세요:\n\n${sectionContent}`);
+                                                }}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                                            >
+                                                🎬 숏폼으로 전달
+                                            </button>
                                         </>
                                     )}
 
                                     {/* Naver Blog Button */}
-                                    {(
-                                        (activeAgent === 'Blog') ||
-                                        (msg.content.includes('## 1. 📝 Blog Post'))
-                                    ) && idx === messages.length - 1 && (
-                                            <button
-                                                onClick={async () => {
-                                                    let fullBody = msg.content.split(/🚦|🚥|Compliance Check/i)[0].trim();
-                                                    let title = "블로그 포스팅";
+                                    {activeAgent === 'Blog' && idx === messages.length - 1 && (
+                                        <button
+                                            onClick={async () => {
+                                                let fullBody = msg.content.split(/🚦|🚥|Compliance Check/i)[0].trim();
+                                                let title = "블로그 포스팅";
 
-                                                    // Logic for specialized section extraction (if mixed content)
-                                                    if (msg.content.includes('## 1. 📝 Blog Post')) {
-                                                        const start = msg.content.indexOf('## 1. 📝 Blog Post');
-                                                        const end = msg.content.indexOf('## 2.');
-                                                        fullBody = msg.content.substring(start, end === -1 ? undefined : end);
+                                                // Logic for specialized section extraction (if mixed content)
+                                                if (msg.content.includes('## 1. 📝 Blog Post')) {
+                                                    const start = msg.content.indexOf('## 1. 📝 Blog Post');
+                                                    const end = msg.content.indexOf('## 2.');
+                                                    fullBody = msg.content.substring(start, end === -1 ? undefined : end);
 
-                                                        // Extract Title from section
-                                                        const lines = fullBody.split('\n');
-                                                        for (const line of lines) {
-                                                            if (line.includes('## 1. 📝')) continue;
-                                                            if (line.toLowerCase().startsWith('title:')) {
-                                                                title = line.replace(/title:/i, '').trim();
-                                                                break;
-                                                            } else if (line.startsWith('#') || line.startsWith('**')) {
-                                                                title = line.replace(/[#*]/g, '').trim();
-                                                                break;
-                                                            }
-                                                        }
-                                                    } else {
-                                                        // Logic for Blog Agent (Full Content)
-                                                        const lines = msg.content.split('\n');
-                                                        for (const line of lines) {
-                                                            if (line.trim().startsWith('#') && !line.includes('##')) {
-                                                                title = line.replace(/^#\s*/, '').trim();
-                                                                break;
-                                                            } else if (line.includes('제목:') || line.includes('Title:')) {
-                                                                title = line.split(':').slice(1).join(':').trim();
-                                                                break;
-                                                            }
+                                                    // Extract Title from section
+                                                    const lines = fullBody.split('\n');
+                                                    for (const line of lines) {
+                                                        if (line.includes('## 1. 📝')) continue;
+                                                        if (line.toLowerCase().startsWith('title:')) {
+                                                            title = line.replace(/title:/i, '').trim();
+                                                            break;
+                                                        } else if (line.startsWith('#') || line.startsWith('**')) {
+                                                            title = line.replace(/[#*]/g, '').trim();
+                                                            break;
                                                         }
                                                     }
-
-                                                    // Sequential Block Parsing (Data Extraction)
-                                                    const blocks = [];
-                                                    const imageRegex = /!\[.*?\]\((.*?)\)/g;
-                                                    let lastIndex = 0;
-                                                    let match;
-
-                                                    const stripMarkdown = (text: string) => {
-                                                        return text
-                                                            .replace(/^#+\s+/gm, '') // Headers
-                                                            .replace(/(\*\*|__)([\s\S]*?)\1/g, '$2') // Bold
-                                                            .replace(/(\*|_)([\s\S]*?)\1/g, '$2') // Italic
-                                                            .replace(/\[([\s\S]*?)\]\([\s\S]*?\)/g, '$1') // Links
-                                                            .replace(/^>\s+/gm, '') // Blockquotes
-                                                            .replace(/^\s*[-*+]\s+/gm, '') // Unordered lists
-                                                            .replace(/^\s*\d+\.\s+/gm, '') // Ordered lists
-                                                            .trim();
-                                                    };
-
-                                                    while ((match = imageRegex.exec(fullBody)) !== null) {
-                                                        const textBefore = fullBody.substring(lastIndex, match.index).trim();
-                                                        if (textBefore) {
-                                                            blocks.push({ type: 'text', content: stripMarkdown(textBefore) });
+                                                } else {
+                                                    // Logic for Blog Agent (Full Content)
+                                                    const lines = msg.content.split('\n');
+                                                    for (const line of lines) {
+                                                        if (line.trim().startsWith('#') && !line.includes('##')) {
+                                                            title = line.replace(/^#\s*/, '').trim();
+                                                            break;
+                                                        } else if (line.includes('제목:') || line.includes('Title:')) {
+                                                            title = line.split(':').slice(1).join(':').trim();
+                                                            break;
                                                         }
+                                                    }
+                                                }
 
-                                                        const url = match[1];
-                                                        try {
-                                                            const fullUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url;
-                                                            const response = await fetch(fullUrl);
-                                                            const blob = await response.blob();
-                                                            const base64 = await new Promise<string>((resolve) => {
-                                                                const reader = new FileReader();
-                                                                reader.onloadend = () => resolve(reader.result as string);
-                                                                reader.readAsDataURL(blob);
-                                                            });
+                                                // Sequential Block Parsing (Data Extraction)
+                                                const blocks = [];
+                                                const imageRegex = /!\[.*?\]\((.*?)\)/g;
+                                                let lastIndex = 0;
+                                                let match;
 
-                                                            const compressed = await (window as any).compressImage(base64);
-                                                            blocks.push({ type: 'image', data: compressed });
-                                                        } catch (err) { }
-                                                        lastIndex = imageRegex.lastIndex;
+                                                const stripMarkdown = (text: string) => {
+                                                    return text
+                                                        .replace(/^#+\s+/gm, '') // Headers
+                                                        .replace(/(\*\*|__)([\s\S]*?)\1/g, '$2') // Bold
+                                                        .replace(/(\*|_)([\s\S]*?)\1/g, '$2') // Italic
+                                                        .replace(/\[([\s\S]*?)\]\([\s\S]*?\)/g, '$1') // Links
+                                                        .replace(/^>\s+/gm, '') // Blockquotes
+                                                        .replace(/^\s*[-*+]\s+/gm, '') // Unordered lists
+                                                        .replace(/^\s*\d+\.\s+/gm, '') // Ordered lists
+                                                        .trim();
+                                                };
+
+                                                while ((match = imageRegex.exec(fullBody)) !== null) {
+                                                    const textBefore = fullBody.substring(lastIndex, match.index).trim();
+                                                    if (textBefore) {
+                                                        blocks.push({ type: 'text', content: stripMarkdown(textBefore) });
                                                     }
 
-                                                    const remainingText = fullBody.substring(lastIndex).trim();
-                                                    if (remainingText) {
-                                                        blocks.push({ type: 'text', content: stripMarkdown(remainingText) });
-                                                    }
-
-                                                    const postData = {
-                                                        title: title,
-                                                        content: stripMarkdown(fullBody),
-                                                        blocks: blocks
-                                                    };
-
-                                                    const dataSize = JSON.stringify(postData).length / (1024 * 1024);
-
-                                                    // Use Handoff API to bridge Electron -> Chrome Extension
+                                                    const url = match[1];
                                                     try {
-                                                        const res = await fetch('/api/handoff', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_NAVER', data: postData })
+                                                        const fullUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url;
+                                                        const response = await fetch(fullUrl);
+                                                        const blob = await response.blob();
+                                                        const base64 = await new Promise<string>((resolve) => {
+                                                            const reader = new FileReader();
+                                                            reader.onloadend = () => resolve(reader.result as string);
+                                                            reader.readAsDataURL(blob);
                                                         });
-                                                        const { id } = await res.json();
-                                                        // Electron URL Click 방식을 우회하여 메인 앱 상태를 유지하며 외부 브라우저로 띄움
-                                                        if ((window as any).electron) {
-                                                            (window as any).electron.openExternal(`${window.location.origin}/handoff?id=${id}`);
-                                                        } else {
-                                                            window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
-                                                        }
-                                                    } catch (e) {
-                                                        console.error('Handoff error:', e);
-                                                        alert('전송 중 오류가 발생했습니다.');
+
+                                                        const compressed = await (window as any).compressImage(base64);
+                                                        blocks.push({ type: 'image', data: compressed });
+                                                    } catch (err) { }
+                                                    lastIndex = imageRegex.lastIndex;
+                                                }
+
+                                                const remainingText = fullBody.substring(lastIndex).trim();
+                                                if (remainingText) {
+                                                    blocks.push({ type: 'text', content: stripMarkdown(remainingText) });
+                                                }
+
+                                                const postData = {
+                                                    title: title,
+                                                    content: stripMarkdown(fullBody),
+                                                    blocks: blocks
+                                                };
+
+                                                const dataSize = JSON.stringify(postData).length / (1024 * 1024);
+
+                                                // Use Handoff API to bridge Electron -> Chrome Extension
+                                                try {
+                                                    const res = await fetch('/api/handoff', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_NAVER', data: postData })
+                                                    });
+                                                    const { id } = await res.json();
+                                                    if ((window as any).electron) {
+                                                        (window as any).electron.openExternal(`${window.location.origin}/handoff?id=${id}`);
+                                                    } else {
+                                                        window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
                                                     }
+                                                } catch (e) {
+                                                    console.error('Handoff error:', e);
+                                                    alert('전송 중 오류가 발생했습니다.');
                                                 }
-                                                }
-                                                className="px-3 py-1.5 bg-[#03C75A] text-white rounded-lg text-xs font-bold hover:bg-[#02b351] transition-colors flex items-center gap-1"
-                                            >
-                                                <span>🚀 네이버 업로드</span>
-                                            </button>
-                                        )}
+                                            }}
+                                            className="px-3 py-1.5 bg-[#03C75A] text-white rounded-lg text-xs font-bold hover:bg-[#02b351] transition-colors flex items-center gap-1"
+                                        >
+                                            <span>🚀 네이버 업로드</span>
+                                        </button>
+                                    )}
 
                                     {/* Instagram Button */}
-                                    {(
-                                        (activeAgent === 'Insta') ||
-                                        (msg.content.includes('## 2. 🎨 Instagram Content'))
-                                    ) && (
-                                            <button
-                                                onClick={async () => {
-                                                    let fullContent = msg.content;
-                                                    if (msg.content.includes('## 2. 🎨 Instagram Content')) {
-                                                        const start = msg.content.indexOf('## 2. 🎨 Instagram Content');
-                                                        const end = msg.content.indexOf('## 3.');
-                                                        const section = msg.content.substring(start, end === -1 ? undefined : end);
-                                                        fullContent = section.replace(/## 2\.\s*🎨\s*Instagram\s*Content/i, '').trim();
-                                                    }
+                                    {activeAgent === 'Insta' && idx === messages.length - 1 && (
+                                        <button
+                                            onClick={async () => {
+                                                let fullContent = msg.content;
+                                                if (msg.content.includes('## 2. 🎨 Instagram Content')) {
+                                                    const start = msg.content.indexOf('## 2. 🎨 Instagram Content');
+                                                    const end = msg.content.indexOf('## 3.');
+                                                    const section = msg.content.substring(start, end === -1 ? undefined : end);
+                                                    fullContent = section.replace(/## 2\.\s*🎨\s*Instagram\s*Content/i, '').trim();
+                                                }
 
-                                                    // 도우미 창(확장프로그램) 전송 전 데이터 세척 (블로그와 동일 원리)
-                                                    fullContent = fullContent.split(/🚦|🚥|Compliance Check/i)[0].trim();
+                                                fullContent = fullContent.split(/🚦|🚥|Compliance Check/i)[0].trim();
 
-                                                    const imageRegex = /!\[.*?\]\((.*?)\)/g;
-                                                    const stripMarkdown = (text: string) => text.replace(/^#+\s+/gm, '').replace(/(\*\*|__)([\s\S]*?)\1/g, '$2').trim();
+                                                const imageRegex = /!\[.*?\]\((.*?)\)/g;
+                                                const stripMarkdown = (text: string) => text.replace(/^#+\s+/gm, '').replace(/(\*\*|__)([\s\S]*?)\1/g, '$2').trim();
 
-                                                    // 1. Text Copy (Caption without image markers and without compliance check)
-                                                    let rawCaption = fullContent.replace(/!\[.*?\]\(.*?\)/g, '').replace(/Nano Banana Prompt:.*?\n/gi, '');
-                                                    rawCaption = rawCaption.split(/🚦|🚥|Compliance Check/i)[0].trim();
+                                                let rawCaption = fullContent.replace(/!\[.*?\]\(.*?\)/g, '').replace(/Nano Banana Prompt:.*?\n/gi, '');
+                                                rawCaption = rawCaption.split(/🚦|🚥|Compliance Check/i)[0].trim();
 
-                                                    const cleanCaption = stripMarkdown(rawCaption);
+                                                const cleanCaption = stripMarkdown(rawCaption);
+                                                try {
+                                                    await navigator.clipboard.writeText(cleanCaption);
+                                                } catch (err) {
+                                                    console.error('Failed to copy text:', err);
+                                                }
+
+                                                let downloadCount = 0;
+                                                const blocks: any[] = [];
+                                                let match;
+                                                while ((match = imageRegex.exec(fullContent)) !== null) {
+                                                    const url = match[1];
+                                                    const fullUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url;
+
+                                                    let nextMatchStart = fullContent.length;
+                                                    const lookaheadRegex = /!\[.*?\]\((.*?)\)/g;
+                                                    lookaheadRegex.lastIndex = imageRegex.lastIndex;
+                                                    const nextMatch = lookaheadRegex.exec(fullContent);
+                                                    if (nextMatch) nextMatchStart = nextMatch.index;
+
+                                                    let slideText = fullContent.substring(imageRegex.lastIndex, nextMatchStart).trim();
+                                                    slideText = stripMarkdown(slideText.replace(/Nano Banana Prompt:.*?\n/gi, ''));
+
                                                     try {
-                                                        await navigator.clipboard.writeText(cleanCaption);
-                                                    } catch (err) {
-                                                        console.error('Failed to copy text:', err);
-                                                    }
-
-                                                    // 2. Image Download & Preview Logic (Slide Blocks)
-                                                    let downloadCount = 0;
-                                                    const blocks: any[] = [];
-                                                    let lastIndex = 0;
-                                                    let match;
-
-                                                    // Loop through all images to create slides
-                                                    while ((match = imageRegex.exec(fullContent)) !== null) {
-                                                        const url = match[1];
-                                                        const fullUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url;
-
-                                                        let nextMatchStart = fullContent.length;
-                                                        const lookaheadRegex = /!\[.*?\]\((.*?)\)/g;
-                                                        lookaheadRegex.lastIndex = imageRegex.lastIndex;
-                                                        const nextMatch = lookaheadRegex.exec(fullContent);
-                                                        if (nextMatch) nextMatchStart = nextMatch.index;
-
-                                                        let slideText = fullContent.substring(imageRegex.lastIndex, nextMatchStart).trim();
-                                                        slideText = stripMarkdown(slideText.replace(/Nano Banana Prompt:.*?\n/gi, ''));
-
-                                                        try {
-                                                            const response = await fetch(fullUrl);
-                                                            const blob = await response.blob();
-                                                            const base64 = await new Promise<string>((resolve) => {
-                                                                const reader = new FileReader();
-                                                                reader.onloadend = () => resolve(reader.result as string);
-                                                                reader.readAsDataURL(blob);
-                                                            });
-
-                                                            const compressed = await (window as any).compressImage(base64);
-
-                                                            blocks.push({
-                                                                type: 'slide',
-                                                                title: `Image ${downloadCount + 1}`,
-                                                                image: compressed, // Base64 for extension preview
-                                                                content: slideText || '(캡션 없음)'
-                                                            });
-
-                                                            const downloadUrl = window.URL.createObjectURL(blob);
-                                                            const a = document.createElement('a');
-                                                            a.href = downloadUrl;
-                                                            a.download = `insta_card_${downloadCount + 1}.jpg`;
-                                                            document.body.appendChild(a);
-                                                            a.click();
-                                                            document.body.removeChild(a);
-                                                            window.URL.revokeObjectURL(downloadUrl);
-                                                            downloadCount++;
-
-                                                            // 브라우저의 다중 다운로드 차단 혹은 겹침 방지를 위한 미세한 지연
-                                                            await new Promise(r => setTimeout(r, 300));
-                                                        } catch (err) {
-                                                            console.error('Failed to process image:', url, err);
-                                                        }
-                                                        lastIndex = imageRegex.lastIndex;
-                                                    }
-
-                                                    // Handle any remaining text before the first image
-                                                    if (blocks.length > 0 && fullContent.indexOf('![') > 0) {
-                                                        const initialText = stripMarkdown(fullContent.substring(0, fullContent.indexOf('![')).trim());
-                                                        if (initialText) {
-                                                            blocks.unshift({ type: 'text', content: initialText });
-                                                        }
-                                                    }
-
-                                                    // Use Handoff API to bridge Electron -> Chrome Extension
-                                                    try {
-                                                        const res = await fetch('/api/handoff', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_INSTA', data: { caption: cleanCaption, blocks: blocks } })
+                                                        const response = await fetch(fullUrl);
+                                                        const blob = await response.blob();
+                                                        const base64 = await new Promise<string>((resolve) => {
+                                                            const reader = new FileReader();
+                                                            reader.onloadend = () => resolve(reader.result as string);
+                                                            reader.readAsDataURL(blob);
                                                         });
-                                                        const { id } = await res.json();
-                                                        if ((window as any).electron) {
-                                                            (window as any).electron.openExternal(`${window.location.origin}/handoff?id=${id}`);
-                                                        } else {
-                                                            window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
-                                                        }
-                                                    } catch (e) {
-                                                        console.error('Handoff error:', e);
+
+                                                        const compressed = await (window as any).compressImage(base64);
+
+                                                        blocks.push({
+                                                            type: 'slide',
+                                                            title: `Image ${downloadCount + 1}`,
+                                                            image: compressed,
+                                                            content: slideText || '(캡션 없음)'
+                                                        });
+
+                                                        const downloadUrl = window.URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = downloadUrl;
+                                                        a.download = `insta_card_${downloadCount + 1}.jpg`;
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        document.body.removeChild(a);
+                                                        window.URL.revokeObjectURL(downloadUrl);
+                                                        downloadCount++;
+                                                        await new Promise(r => setTimeout(r, 300));
+                                                    } catch (err) {
+                                                        console.error('Failed to process image:', url, err);
                                                     }
-                                                }}
-                                                className="px-3 py-1.5 bg-gradient-to-tr from-[#FFDC80] via-[#F56040] to-[#833AB4] text-white rounded-lg text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
-                                            >
-                                                <span>🚀 인스타 업로드</span>
-                                            </button>
-                                        )}
+                                                }
+
+                                                if (blocks.length > 0 && fullContent.indexOf('![') > 0) {
+                                                    const initialText = stripMarkdown(fullContent.substring(0, fullContent.indexOf('![')).trim());
+                                                    if (initialText) {
+                                                        blocks.unshift({ type: 'text', content: initialText });
+                                                    }
+                                                }
+
+                                                try {
+                                                    const res = await fetch('/api/handoff', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_INSTA', data: { caption: cleanCaption, blocks: blocks } })
+                                                    });
+                                                    const { id } = await res.json();
+                                                    if ((window as any).electron) {
+                                                        (window as any).electron.openExternal(`${window.location.origin}/handoff?id=${id}`);
+                                                    } else {
+                                                        window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
+                                                    }
+                                                } catch (e) {
+                                                    console.error('Handoff error:', e);
+                                                }
+                                            }}
+                                            className="px-3 py-1.5 bg-gradient-to-tr from-[#FFDC80] via-[#F56040] to-[#833AB4] text-white rounded-lg text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
+                                        >
+                                            <span>🚀 인스타 업로드</span>
+                                        </button>
+                                    )}
 
                                     {/* Shortform Script Copy Button */}
                                     {activeAgent === 'Shortform' && (
@@ -745,65 +793,55 @@ export default function ChatInterface() {
                                     )}
 
                                     {/* Threads Button */}
-                                    {(
-                                        (activeAgent === 'Threads') ||
-                                        (msg.content.includes('Post 1:'))
-                                    ) && idx === messages.length - 1 && (
-                                            <button
-                                                onClick={async () => {
-                                                    let fullContent = msg.content.split(/🚦|🚥|Compliance Check/i)[0].trim();
+                                    {activeAgent === 'Threads' && idx === messages.length - 1 && (
+                                        <button
+                                            onClick={async () => {
+                                                let fullContent = msg.content.split(/🚦|🚥|Compliance Check/i)[0].trim();
+                                                try {
+                                                    await navigator.clipboard.writeText(fullContent);
+                                                } catch (err) {
+                                                    console.error('Failed to copy:', err);
+                                                }
 
-                                                    // Copy to clipboard
-                                                    try {
-                                                        await navigator.clipboard.writeText(fullContent);
-                                                    } catch (err) {
-                                                        console.error('Failed to copy:', err);
+                                                try {
+                                                    const res = await fetch('/api/handoff', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_THREADS', data: { content: fullContent } })
+                                                    });
+                                                    const { id } = await res.json();
+                                                    if ((window as any).electron) {
+                                                        (window as any).electron.openExternal(`${window.location.origin}/handoff?id=${id}`);
+                                                    } else {
+                                                        window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
                                                     }
-
-                                                    // Use Handoff API to bridge Electron -> Chrome Extension
-                                                    try {
-                                                        const res = await fetch('/api/handoff', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({ type: 'FAIRECLICK_UPLOAD_THREADS', data: { content: fullContent } })
-                                                        });
-                                                        const { id } = await res.json();
-                                                        if ((window as any).electronAPI) {
-                                                            (window as any).electronAPI.send('open-external', `${window.location.origin}/handoff?id=${id}`);
-                                                        } else {
-                                                            window.open(`/handoff?id=${id}`, '_blank', 'noreferrer,noopener');
-                                                        }
-                                                    } catch (e) {
-                                                        console.error('Handoff error:', e);
-                                                    }
-                                                }}
-                                                className="px-3 py-1.5 bg-black text-white rounded-lg text-xs font-bold hover:bg-gray-900 transition-colors flex items-center gap-1"
-                                            >
-                                                <span>🚀 스레드 업로드</span>
-                                            </button>
-                                        )}
+                                                } catch (e) {
+                                                    console.error('Handoff error:', e);
+                                                }
+                                            }}
+                                            className="px-3 py-1.5 bg-black text-white rounded-lg text-xs font-bold hover:bg-gray-900 transition-colors flex items-center gap-1"
+                                        >
+                                            <span>🚀 스레드 업로드</span>
+                                        </button>
+                                    )}
 
                                     {/* Reputation Agent Buttons */}
-                                    {(
-                                        activeAgent === 'Reputation' ||
-                                        (msg.content.includes('## 🛡️ Reputation Review Reply'))
-                                    ) && (
-                                            <>
-                                                <button
-                                                    onClick={() => window.open('https://map.naver.com/', '_blank')}
-                                                    className="px-3 py-1.5 bg-[#03C75A] text-white rounded-lg text-xs font-bold hover:bg-[#02b351] transition-colors flex items-center gap-1"
-                                                >
-                                                    <span>⭐ 네이버 리뷰 바로가기</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => window.open('https://business.google.com/', '_blank')}
-                                                    className="px-3 py-1.5 bg-[#4285F4] text-white rounded-lg text-xs font-bold hover:bg-[#3367d6] transition-colors flex items-center gap-1"
-                                                >
-                                                    <span>⭐ 구글 리뷰 관리</span>
-                                                </button>
-
-                                            </>
-                                        )}
+                                    {activeAgent === 'Reputation' && (
+                                        <>
+                                            <button
+                                                onClick={() => window.open('https://map.naver.com/', '_blank')}
+                                                className="px-3 py-1.5 bg-[#03C75A] text-white rounded-lg text-xs font-bold hover:bg-[#02b351] transition-colors flex items-center gap-1"
+                                            >
+                                                <span>⭐ 네이버 리뷰 바로가기</span>
+                                            </button>
+                                            <button
+                                                onClick={() => window.open('https://business.google.com/', '_blank')}
+                                                className="px-3 py-1.5 bg-[#4285F4] text-white rounded-lg text-xs font-bold hover:bg-[#3367d6] transition-colors flex items-center gap-1"
+                                            >
+                                                <span>⭐ 구글 리뷰 관리</span>
+                                            </button>
+                                        </>
+                                    )}
 
                                 </div>
                             )}

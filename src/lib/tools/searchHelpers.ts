@@ -42,9 +42,9 @@ export async function search_local_trends(args: { query: string; max_results?: n
                     'm.blog.naver.com/seoul_yonsei',
                     ...(args.exclude_domains ?? [])
                 ],
-                max_results: args.max_results ?? 5,
-                // 최근 N일 이내 문서만 수집. 기본값 180일(6개월). 오래된 글 차단.
-                days: args.days ?? 180,
+                max_results: args.max_results ?? 7,
+                // 최근 90일(3개월) 이내 문서만 수집하여 최신 트렌드 보장.
+                days: args.days ?? 90,
                 include_answer: false,
                 include_raw_content: false,
             })
@@ -79,6 +79,12 @@ export async function search_local_trends(args: { query: string; max_results?: n
  */
 export async function scrape_website(args: { url: string }) {
     const apiKey = process.env.TAVILY_API_KEY;
+
+    // [🚨 Security] 자사 블로그 스크래핑 방지 (자기 복제 및 검색 누락 방지)
+    if (args.url.includes('blog.naver.com/seoul_yonsei') || args.url.includes('m.blog.naver.com/seoul_yonsei')) {
+        console.warn(`[Scrape] Blocked self-scraping attempt: ${args.url}`);
+        return { error: '자사 블로그의 내용은 스크래핑할 수 없습니다. 대신 자신의 지식과 다른 외부 자료를 참고하세요.' };
+    }
 
     if (!apiKey) {
         return {
