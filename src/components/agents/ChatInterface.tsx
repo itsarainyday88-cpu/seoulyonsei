@@ -21,7 +21,7 @@ export default function ChatInterface() {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
-    const [attachments, setAttachments] = useState<{ name: string; content: string; url?: string }[]>([]);
+    const [attachments, setAttachments] = useState<{ name: string; content: string; url?: string; file?: File }[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -177,6 +177,43 @@ export default function ChatInterface() {
 
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 10);
 
+            // --- [NEW] 파일 선(先)첨부 후(後)분석 로직: 전송 시점에 실제 업로드 및 분석 수행 ---
+            const finalAttachments = [];
+            if (attachments.length > 0) {
+                for (const att of attachments) {
+                    if (att.file) {
+                        try {
+                            const formData = new FormData();
+                            formData.append('file', att.file);
+                            formData.append('agentId', activeAgent);
+
+                            const uploadRes = await fetch('/api/upload', {
+                                method: 'POST',
+                                body: formData,
+                                signal: controller.signal
+                            });
+
+                            if (!uploadRes.ok) {
+                                const errData = await uploadRes.json().catch(() => ({}));
+                                throw new Error(`${att.name}: ${errData.error || '업로드 실패'}`);
+                            }
+                            const data = await uploadRes.json();
+                            
+                            finalAttachments.push({
+                                name: att.name,
+                                content: data.text || `[분석되지 않은 파일: ${att.name}]`,
+                                url: data.url
+                            });
+                        } catch (err) {
+                            console.error('Upload failed during send:', err);
+                            // 업로드 실패 시에도 최소한의 정보는 유지 (또는 제외 결정 가능)
+                        }
+                    } else {
+                        finalAttachments.push(att);
+                    }
+                }
+            }
+
             // Simple intent classification for tool switching
             const searchKeywords = ['검색', '찾아', '조사', 'search', '구글', 'google', '최신', '정보', '가격', '근황'];
             const shouldSearch = searchKeywords.some(keyword => userMessage.toLowerCase().includes(keyword));
@@ -199,10 +236,12 @@ export default function ChatInterface() {
                 signal: controller.signal,
                 body: JSON.stringify({
                     agentId: activeAgent,
-                    message: (attachments.length > 0
+                    message: (finalAttachments.length > 0
                         ? (activeAgent === 'Insta'
-                            ? `[사용자 첨부 이미지]\n${attachments.map((a: any) => `![${a.name}](${a.url})`).join('\n')}\n\n🚨 [필독 지시: 위 첨부 이미지들을 인스타그램 게시물 최상단에 독립적으로 먼저 나열하라. 이미지 사이에 절대 텍스트를 넣지 마라. 모든 이미지가 출력된 후에만 캡션을 시작하라.]\n\n[사용자 요청]\n${userMessage}\n\n[파일 분석 내용]\n${attachments.map((a: any) => `- ${a.name}: ${a.content}`).join('\n')}`
-                            : `${userMessage}\n\n[사용자 첨부 파일/이미지 분석 데이터]\n${attachments.map((a: any) => `- 파일명: ${a.name}\n- 첨부 이미지 URL: ${a.url}\n- 시각적 분석 내용: ${a.content.replace(/안내문|카드뉴스|포스터|글자가\s*적힌|텍스트가\s*포함된/g, '이미지')}`).join('\n\n')}\n\n🚨 [중요 지침]: 위 이미지들을 글의 문맥상 가장 적절하고 자연스러운 위치에 ![파일명](URL) 마크다운 코드를 사용하여 직접 삽입하라. 각 사진이 보여주는 시각적 정보와 분석 내용을 바탕으로 글의 흐름에 어긋나지 않게 내용을 서술하라.`)
+                            ? `🚨 [필독 지시: 인스타그램 게시물 작성 모드]\n1. 아래 첨부한 이미지들을 게시물 최상단에 마크다운 ![]() 형식으로 먼저 나열하라.\n2. 이미지들 사이에 절대 텍스트를 넣지 마라.\n3. 모든 이미지가 출력된 후에만 내용을 시작하라.\n\n[사용자 첨부 이미지]\n${finalAttachments.map((a: any) => `![${a.name}](${a.url})`).join('\n')}\n\n[사용자 요청]\n${userMessage}\n\n[사진 정밀 분석 내용]\n${finalAttachments.map((a: any) => `- ${a.name}: ${a.content}`).join('\n')}`
+                            : (activeAgent === 'Marketer'
+                                ? `🚨 [필독 지시: 마케팅 전략 기획 모드]\n아래 이미지는 전략 수립 참고용입니다. 기획서 본문(XML태그 외부/내부 모두)에 마크다운 ![]() 태그를 직접 출력하지 마십시오. 대신 블로그나 인스타 전략 태그 내에 어떤 사진을 활용하라고 전문적인 지시만 내리십시오.\n\n[사용자 첨부 이미지 정보]\n${finalAttachments.map((a: any) => `- 파일명: ${a.name}\n- 분석 내용: ${a.content}\n- 실제 URL: ${a.url}`).join('\n')}\n\n[사용자 요청]\n${userMessage}`
+                                : `${userMessage}\n\n[사용자 첨부 파일/이미지 분석 데이터]\n${finalAttachments.map((a: any) => `- 파일명: ${a.name}\n- 분석 내용: ${a.content}\n- 이미지 마크다운: ![${a.name}](${a.url})`).join('\n\n')}\n\n🚨 [중요 지침]: 위 이미지들을 글의 흐름상 가장 적절한 위치에 삽입하라. 사진의 구체적 분위기를 문장에 반영하라.`))
                         : userMessage) + (contextInjection ? contextInjection : ''),
                     history: messages,
                     useSearch: shouldSearch
@@ -388,45 +427,24 @@ export default function ChatInterface() {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
-        setLoading(true);
-        try {
-            const uploadPromises = Array.from(files).map(async (file) => {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('agentId', activeAgent);
+        const newAttachments = Array.from(files).map(file => {
+            const isImage = file.type.startsWith('image/');
+            return {
+                name: file.name,
+                content: '', // 전송 시점에 분석됨
+                url: isImage ? URL.createObjectURL(file) : '', // 이미지면 프리뷰용 임시 URL 생성
+                file: file
+            };
+        });
 
-                const res = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!res.ok) throw new Error(`${file.name} 업로드 실패`);
-
-                const data = await res.json();
-                // 원장님 말씀대로, 분석이 안 되더라도(data.text가 없더라도) 
-                // 일단 URL(업로드 주소)만 있으면 채팅창에 즉시 붙입니다.
-                return {
-                    name: file.name,
-                    content: data.text || `[분석되지 않은 파일: ${file.name}]`,
-                    url: data.url
-                };
-            });
-
-            const results = await Promise.all(uploadPromises);
-            setAttachments(prev => [...prev, ...results]);
-        } catch (error) {
-            console.error('Upload error:', error);
-            alert('파일 분석에 실패했습니다.');
-        } finally {
-            setLoading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
+        setAttachments(prev => [...prev, ...newAttachments]);
+        
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
@@ -873,40 +891,41 @@ export default function ChatInterface() {
                         multiple
                         accept=".pdf,.txt,.md,.pptx,.docx,.xlsx,.png,.jpg,.jpeg,.webp,.csv"
                     />
-                    {process.env.NEXT_PUBLIC_APP_MODE !== 'lite' && (
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="p-3 text-gray-400 hover:text-primary transition-all rounded-xl hover:bg-secondary/20 flex flex-col items-center gap-1 min-w-[60px]"
-                            title="파일 업로드 (PDF/Text)"
-                        >
-                            <Paperclip className="w-5 h-5" />
-                            <span className="text-[10px] font-bold">파일 첨부</span>
-                        </button>
-                    )}
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-3 text-gray-400 hover:text-primary transition-all rounded-xl hover:bg-secondary/20 flex flex-col items-center gap-1 min-w-[60px]"
+                        title="파일 업로드 (PDF/Text/Image)"
+                    >
+                        <Paperclip className="w-5 h-5" />
+                        <span className="text-[10px] font-bold">파일 첨부</span>
+                    </button>
 
                     {attachments.length > 0 && (
                         <div className="absolute bottom-full left-0 mb-4 flex flex-wrap gap-3 w-full px-2 max-h-48 overflow-y-auto pb-4 scrollbar-none">
-                            {attachments.map((file: { name: string; content: string; url?: string }, idx: number) => {
-                                const isImage = file.url && (file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+                            {attachments.map((att: any, idx: number) => {
+                                const isImage = att.url && (att.name.match(/\.(jpg|jpeg|png|gif|webp)$/i));
 
                                 if (isImage) {
                                     return (
                                         <div key={idx} className="relative group animate-in zoom-in-90 fade-in duration-200">
                                             <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-secondary/30 shadow-lg bg-gray-100 ring-4 ring-white/50">
                                                 <img
-                                                    src={file.url}
-                                                    alt={file.name}
+                                                    src={att.url}
+                                                    alt={att.name}
                                                     className="w-full h-full object-cover transition-transform group-hover:scale-110"
                                                 />
                                             </div>
                                             <button
-                                                onClick={() => setAttachments(prev => prev.filter((_, i: number) => i !== idx))}
+                                                onClick={() => {
+                                                    if (att.url.startsWith('blob:')) URL.revokeObjectURL(att.url);
+                                                    setAttachments(prev => prev.filter((_, i: number) => i !== idx));
+                                                }}
                                                 className="absolute -top-2 -right-2 bg-secondary text-white p-1 rounded-full shadow-md hover:bg-primary hover:text-secondary transition-all z-10 scale-0 group-hover:scale-100 duration-200"
                                             >
                                                 <X className="w-3.5 h-3.5 stroke-[3px]" />
                                             </button>
                                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center pointer-events-none">
-                                                <span className="text-[9px] text-white font-bold truncate px-1 w-full text-center">{file.name}</span>
+                                                <span className="text-[9px] text-white font-bold truncate px-1 w-full text-center">{att.name}</span>
                                             </div>
                                         </div>
                                     );
@@ -917,9 +936,12 @@ export default function ChatInterface() {
                                         <div className="bg-secondary/10 p-1.5 rounded-lg">
                                             <FileText className="w-4 h-4 text-secondary" />
                                         </div>
-                                        <span className="max-w-[120px] truncate">{file.name}</span>
+                                        <span className="max-w-[120px] truncate">{att.name}</span>
                                         <button
-                                            onClick={() => setAttachments(prev => prev.filter((_, i: number) => i !== idx))}
+                                            onClick={() => {
+                                                if (att.url && att.url.startsWith('blob:')) URL.revokeObjectURL(att.url);
+                                                setAttachments(prev => prev.filter((_, i: number) => i !== idx));
+                                            }}
                                             className="p-1 px-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all ml-1"
                                         >
                                             <X className="w-3.5 h-3.5 stroke-[3px]" />

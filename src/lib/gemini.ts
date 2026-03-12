@@ -18,6 +18,52 @@ async function getFallbackImageAsync(promptText: string, usedUrls: string[] = []
     return getFallbackImage(promptText, usedUrls);
 }
 
+// [🚨 Academic Year Map] 서버 시간 기준 동적 학년도 계산
+export const getAcademicYearContext = () => {
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    // 입시 학년도 계산 (한국 기준: 현재 연도 + (4 - 학년))
+    const hs3Year = currentYear + 1;
+    const hs2Year = currentYear + 2;
+    const hs1Year = currentYear + 3;
+    const ms3Year = currentYear + 4;
+
+    return `
+[🚨 GLOBAL ACADEMIC YEAR FACT]
+현재 시점: ${currentYear}년 ${currentMonth}월 (KST)
+- 현 고3: ${hs3Year}학년도 대입
+- 현 고2: ${hs2Year}학년도 대입
+- 현 고1: ${hs1Year}학년도 대입
+- 현 중3: ${ms3Year}학년도 대입
+이 기준은 시스템 시각에 따른 물리적 사실이므로 모든 기획 시 반드시 준수하라.
+    `;
+};
+
+// [🚨 User Intent Override] 사용자가 명시한 타겟을 코드가 직접 감지하여 AI에게 전역 강제 지침 주입
+const getTargetOverrideInstruction = (message: string) => {
+    const targets = [
+        { patterns: /(중학|중교|중학생|중딩|중1|중2|중3)/, label: '중등부(Middle School)' },
+        { patterns: /(초등|초교|초등부|초딩|초4|초5|초6)/, label: '초등부(Elementary School)' },
+        { patterns: /(고3|수험생|N수|재수)/, label: '고3/N수(Senior High)' },
+        { patterns: /(고2|현 고2)/, label: '고2(Junior High)' },
+        { patterns: /(고1|현 고1)/, label: '고1(Freshman High)' }
+    ];
+
+    for (const t of targets) {
+        if (t.patterns.test(message)) {
+            return `\n\n[🚨 CRITICAL PRIORITY: USER TARGET CONTEXT]\n` +
+                   `사용자가 명시적으로 특정 타겟(${t.label})을 지정했습니다.\n` +
+                   `- 데이터 분석 단계를 포함한 모든 서론을 과감히 생략하고, 즉시 ${t.label} 맞춤형 전략을 출력하십시오.\n` +
+                   `- "현재 김포 지역의 데이터에 따르면..." 식의 불필요한 서설을 절대 뱉지 마라. 바로 본론으로 들어가라.\n` +
+                   `- 'search_local_trends' 도구는 오직 이 타겟(${t.label})의 구체적 근거를 보강하는 용도로만 사용하라.\n` +
+                   `- 답변의 첫 문장부터 끝까지 오직 '${t.label}'을 위한 기획에만 매진하라.\n\n`;
+        }
+    }
+    return '';
+};
+
 const agentTemperatures: Record<string, number> = {
     Insta: 0.95,
     Blog: 0.9,
@@ -80,22 +126,30 @@ export async function* generateAgentResponseStream(agentId: string, message: str
 
         // [📌 핵심] 사용자가 직접 이미지를 첨부했는지 확인 (분석 우선순위 보존 목적)
         const hasUserAttachedImage = message.includes('![') || message.includes('사용자 첨부') || message.includes('이미지 정보');
-        // RAG 스타일 컨텍스트: Blog 및 Threads 에이전트에 적용
+        // [📌 전용 RAG] Blog 및 Threads 에이전트에 대해서만 원장님의 과거 글투(Style)를 검색하여 주입
+        let styleContext = '';
         if (agentId === 'Blog' || agentId === 'Threads') {
-            const styleContext = await retrieveStyleContext(message);
-            if (styleContext) {
-                // RAG에 실제 원장님 글투 예시가 있으면 하드코딩 지침보다 최우선 적용
-                systemInstruction += `\n\n[✍️ RAG Style Context - 최우선 글투 기준]\n` +
-                    `⚠️ 아래에 실제 원장님이 직접 작성한 과거 포스팅 예시가 있습니다.\n` +
-                    `이 예시의 어투, 문장 길이, 호흡, 단어 선택을 [실제 원장님 글투] 가이드라인보다 최우선으로 따르십시오.\n` +
-                    `아래 예시가 비어있거나 없을 경우에만 [실제 원장님 글투] 섹션의 기본 가이드라인을 따르십시오.\n\n` +
-                    styleContext;
-            }
+            styleContext = await retrieveStyleContext(message);
         }
+        
+        if (styleContext) {
+            systemInstruction += `\n\n[✍️ RAG Style Context - 실제 원장님 글투 데이터]\n` +
+                `⚠️ 아래는 원장님이 직접 작성한 고퀄리티 포스팅 예시들입니다.\n` +
+                `이 예시의 [단어 선택, 문장 종결 어미(하십시오체/해요체 등), 특유의 호흡]을 100% 모사하십시오.\n` +
+                `어설픈 AI 말투는 지우고, 마치 원장님이 직접 쓴 것처럼 자연스럽게 작성하세요.\n\n` +
+                styleContext;
+        }
+
+        // [🚨 Code-Level Precision] 모든 지능의 최정점에 사용자 의도(Override)를 배치
+        const academicYearContext = getAcademicYearContext();
+        const intentOverride = getTargetOverrideInstruction(message);
+        
+        // 원장님의 타겟 지시는 시스템 명령 중 가장 앞에 두어 AI의 기획 방향을 물리적으로 선점함
+        const finalSystemInstruction = `${intentOverride}\n${systemInstruction}\n${academicYearContext}`;
 
         const model = genAI.getGenerativeModel({
             model: modelName,
-            systemInstruction: systemInstruction,
+            systemInstruction: finalSystemInstruction,
             tools: tools as any,
             generationConfig: {
                 temperature: agentTemperatures[agentId] || 0.7,
@@ -103,7 +157,7 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             },
         });
 
-        // [🛠️ Vision Support] 메시지 내 이미지 URL 추출 및 Parts 변환
+        // [🛠️ Vision Support] 메시지 내 이미지 URL 추출 및 Parts 변환 (이미지 태그는 텍스트로 보존)
         const prepareMessageParts = async (msg: string) => {
             const parts: any[] = [];
             const imageRegex = /!\[.*?\]\((https?:\/\/.*?|data:image\/.*?)\)/g;
@@ -111,32 +165,41 @@ export async function* generateAgentResponseStream(agentId: string, message: str
             let match;
 
             while ((match = imageRegex.exec(msg)) !== null) {
-                const textBefore = msg.substring(lastIndex, match.index).trim();
+                // 1. 이미지 태그 이전의 텍스트 추가
+                const textBefore = msg.substring(lastIndex, match.index);
                 if (textBefore) parts.push({ text: textBefore });
 
+                const fullTag = match[0]; // ![이름](URL) 전체 태그
                 const url = match[1];
-                try {
-                    console.log(`[Vision] Fetching image for analysis: ${url}`);
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        const buffer = await response.arrayBuffer();
-                        const base64 = Buffer.from(buffer).toString('base64');
-                        const mimeType = response.headers.get('content-type') || 'image/jpeg';
 
-                        parts.push({
-                            inlineData: {
-                                data: base64,
-                                mimeType: mimeType
-                            }
-                        });
+                // 2. 중요: 이미지 태그 자체를 텍스트 파트에 포함하여 AI가 이를 인지하고 답장에 쓸 수 있게 함
+                parts.push({ text: fullTag });
+
+                // 3. Vision 분석을 위해 실제 이미지 데이터 추가 (성능/비용 고려하여 절대 경로만 처리)
+                if (url.startsWith('http')) {
+                    try {
+                        console.log(`[Vision] Fetching image for analysis: ${url}`);
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const buffer = await response.arrayBuffer();
+                            const base64 = Buffer.from(buffer).toString('base64');
+                            const mimeType = response.headers.get('content-type') || 'image/jpeg';
+
+                            parts.push({
+                                inlineData: {
+                                    data: base64,
+                                    mimeType: mimeType
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        console.error('[Vision] Failed to fetch image:', url, err);
                     }
-                } catch (err) {
-                    console.error('[Vision] Failed to fetch image:', url, err);
                 }
                 lastIndex = imageRegex.lastIndex;
             }
 
-            const remainingText = msg.substring(lastIndex).trim();
+            const remainingText = msg.substring(lastIndex);
             if (remainingText) parts.push({ text: remainingText });
 
             return parts.length > 0 ? parts : [{ text: msg }];
@@ -353,11 +416,61 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                 } else {
                     let textToYield = buffer;
 
-                    // [🚨 Coding-Level Restriction] Shortform 에이전트는 마지막 출력에서도 이미지 완전 배제
-                    if (agentId === 'Shortform') {
-                        textToYield = textToYield.replace(/!\[.*?\]\(.*?\)/g, '');
-                        textToYield = textToYield.replace(/\[IMAGE_GENERATE:.*?\]/gi, '');
+                    // [🚨 Marketer 전용: 의도 기반 물리적 섹션 추출]
+                    // 원장님이 특정 채널(블로그/인스타 등)만 요청했을 경우, 다른 채널의 전략은 코드가 직접 폐기함
+                    if (agentId === 'Marketer') {
+                        const isBlogOnly = message.includes('블로그');
+                        const isInstaOnly = message.includes('인스타') || message.includes('인스타그램');
+                        const isShortOnly = message.includes('숏폼') || message.includes('릴스');
+
+                        // 특정 채널 하나만 언급된 경우, 해당 XML 태그 내용과 [Compliance Check]를 함께 추출
+                        if (isBlogOnly && !isInstaOnly && !isShortOnly) {
+                            const complianceMatch = textToYield.match(/(🚦 Compliance Check[\s\S]*?)$/i);
+                            const complianceText = complianceMatch ? `\n\n---\n\n${complianceMatch[1]}` : '';
+
+                            if (textToYield.includes('<blog_strategy>')) {
+                                const match = textToYield.match(/<blog_strategy>([\s\S]*?)<\/blog_strategy>/);
+                                if (match) {
+                                    textToYield = match[1].trim() + complianceText;
+                                } else {
+                                    textToYield = (textToYield.split('<blog_strategy>')[1] || '') + complianceText;
+                                }
+                            } else if (!textToYield.includes('블로그 기획') && !textToYield.includes('Blog Strategy')) {
+                                textToYield = '[기획 분석 중...]';
+                            }
+                        } else if (isInstaOnly && !isBlogOnly && !isShortOnly) {
+                            const complianceMatch = textToYield.match(/(🚦 Compliance Check[\s\S]*?)$/i);
+                            const complianceText = complianceMatch ? `\n\n---\n\n${complianceMatch[1]}` : '';
+
+                            if (textToYield.includes('<insta_strategy>')) {
+                                const match = textToYield.match(/<insta_strategy>([\s\S]*?)<\/insta_strategy>/);
+                                if (match) {
+                                    textToYield = match[1].trim() + complianceText;
+                                } else {
+                                    textToYield = (textToYield.split('<insta_strategy>')[1] || '') + complianceText;
+                                }
+                            } else if (!textToYield.includes('인스타') && !textToYield.includes('Insta Strategy')) {
+                                textToYield = '[인스타그램 전략 수립 중...]';
+                            }
+                        }
                     }
+
+                    // [🚨 Coding-Level Restriction] 모든 영문 내부 태그 찌꺼기 소거
+                    textToYield = textToYield.replace(/<[^>]*>/g, ''); 
+                    textToYield = textToYield.replace(/\[(Strategy|Hook|Insight|Philosophy|Vibe|Visual|Scenario|CTA|Part).*?\]/gi, '');
+                    textToYield = textToYield.replace(/(Strategy|Insight|Action|Trust|Authority|Role|Prompt):\s*/gi, '');
+
+                    // [🚨 엑박 및 텍스트 이미지 라벨 원천 차단] 
+                    if (agentId === 'Shortform' || agentId === 'Marketer') {
+                        textToYield = textToYield.replace(/!\[.*?\](\(.*?\))?/g, ''); 
+                        textToYield = textToYield.replace(/\[IMAGE_GENERATE:.*?\]/gi, '');
+                        // AI가 텍스트로 장난치는 '이미지 자리표시자' 단어들 삭제 (단독 행으로 존재할 때만 삭제하여 본문 보호)
+                        textToYield = textToYield.replace(/^\s*(학원 로고|원장진|원장 사진|AI 이미지|배경 이미지|학원 내부|시각 자료|이미지 전략)\s*(\n|$)/gim, '');
+                    }
+
+                    // [📊 가독성 강화] 소제목(#) 위아래 여백 최적화 (2줄로 제한)
+                    textToYield = textToYield.replace(/(^|\n)(#+.*?)(\n|$)/g, '$1\n$2\n');
+                    textToYield = textToYield.replace(/\n{2,}/g, '\n\n'); 
 
                     // [🚨 Coding-Level Restriction] Threads 에러 방지용 최종 필터
                     if (agentId === 'Threads') {
@@ -398,9 +511,14 @@ export async function* generateAgentResponseStream(agentId: string, message: str
                     if (agentId !== 'Insta') {
                         textToYield = verifyFactIntegrity(textToYield, verifiedFacts);
                     }
+                    
+                    // [🔥 결정적 수정] 마크다운 이미지 태그(![)가 포함된 버퍼는 절대 보정하지 않음 (완전할 때까지 대기)
                     if (agentId === 'Insta' && !isFirstTextPassed && buffer.trim().length > 0) {
-                        textToYield = enforceInstaHook(buffer);
-                        isFirstTextPassed = true;
+                        const hasPartialImage = buffer.includes('![') && !buffer.includes(')');
+                        if (!hasPartialImage) {
+                            textToYield = enforceInstaHook(buffer);
+                            isFirstTextPassed = true;
+                        }
                     }
                     yield textToYield;
                 }
@@ -456,14 +574,14 @@ export async function* generateAgentResponseStream(agentId: string, message: str
         }
     };
 
-    // [Final Queue] 원장님 원래 설정 모델 리스트 (지능 중심)
+    // [Final Queue] 2026 최신 모델 인텔리전스 반영 (원장님 가이드 기준)
     const modelQueue = [
-        'gemini-3.1-pro-preview',
-        'gemini-3-pro-preview',
-        'gemini-3-flash-preview',
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash'
+        'gemini-3.1-pro-preview',       // 플래그십 (복잡한 문제 해결)
+        'gemini-3-deep-think',          // 고난도 추론 특화 (Stable)
+        'gemini-3-flash-preview',       // 실시간 에이전트 권장 (범용)
+        'gemini-3.1-flash-lite-preview', // 가성비/저지연
+        'gemini-2.5-pro',               // 멀티모달 분석 표준
+        'gemini-2.5-flash'              // 안정적인 메인스트림
     ];
 
     let lastError: any = null;
@@ -493,21 +611,24 @@ function enforceInstaHook(text: string): string {
     if (text.includes('![AI 생성 이미지]') || text.includes('![학원 이미지]') || text.includes('![')) return text;
 
     const lines = text.split('\n');
-    let firstLineIdx = -1;
+    let firstTextLineIdx = -1;
 
+    // 1. [성역 보호] 이미지 태그가 있는 줄은 건드리지 않고 '진짜 텍스트'가 시작되는 줄을 찾습니다.
     for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim().length > 0) {
-            firstLineIdx = i;
+        const line = lines[i].trim();
+        if (line.includes('![') && line.includes('](')) continue; 
+        if (line.length > 3) {
+            firstTextLineIdx = i;
             break;
         }
     }
 
-    if (firstLineIdx === -1) return text;
+    if (firstTextLineIdx === -1) return text;
 
-    let firstLine = lines[firstLineIdx].trim();
+    let firstLine = lines[firstTextLineIdx].trim();
 
-    // 1. 지능형 길이 보정 (25~30자 유연)
-    // 무조건 자르는게 아니라, 문장 부호(. ! ?)가 20~35자 사이에 있다면 거기서 끊음
+    // 2. [기존 기능 복구] 지능형 길이 보정 (25~30자 유연)
+    // 문장 부호(. ! ?)가 20~35자 사이에 있다면 거기서 끊는 원장님의 원본 로직입니다.
     if (firstLine.length > 25) {
         const punctuationMatch = firstLine.substring(15, 35).match(/[.!?]/);
         if (punctuationMatch && punctuationMatch.index !== undefined) {
@@ -523,13 +644,13 @@ function enforceInstaHook(text: string): string {
         }
     }
 
-    // 2. 이모지 체크 및 자동 보강
+    // 3. [기존 기능 복구] 이모지 체크 및 자동 보강
     const emojiRegex = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/;
     if (!emojiRegex.test(firstLine)) {
         firstLine = `📌 ${firstLine} 💡`;
     }
 
-    lines[firstLineIdx] = firstLine;
+    lines[firstTextLineIdx] = firstLine;
     return lines.join('\n');
 }
 
@@ -555,6 +676,10 @@ function filterPhantomReferences(text: string): string {
         /^위\s+내용처럼\s+/g,
         /^이미지(가)?\s+증명하듯\s+/g
     ];
+
+    // [🚨 사용자 첨부 사진 예외] 사용자가 직접 사진을 올린 경우, 사진 묘사를 삭제하지 않음
+    const hasUserImages = text.includes('![') && text.includes('supabase');
+    if (hasUserImages) return text;
 
     let cleanedText = text;
     for (const pattern of phantomPatterns) {
@@ -612,8 +737,8 @@ function verifyFactIntegrity(text: string, knownFacts: string): string {
             return match; // 검증 성공
         }
 
-        // 3. 검증 실패 시: 원장님께 공포의 팩트 체크 신호를 보냄
-        console.warn(`[🚨 Truth-Guard Blocked] Unverified admission stat: ${match} (Source missing)`);
+        // 3. 검증 실패 시: James님(개발자) 확인용 로그 및 사용자 시각화
+        console.warn(`[🚨 FACT CHECK FAILED] Unverified number detected: ${match}. This value is currently NOT in our verified fact 리스트.`);
         return `[🚨 확인 필요: ${match}]`;
     });
 }

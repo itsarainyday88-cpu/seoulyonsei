@@ -31,7 +31,7 @@ export async function POST(req: Request) {
                     }
 
                     // --- Auto-Save Logic (Local MD file) ---
-                    if (process.env.NEXT_PUBLIC_APP_MODE !== 'lite' && fullResponseBuffer.trim().length > 50) {
+                    if (fullResponseBuffer.trim().length > 50) {
                         try {
                             const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                             const baseDir = process.env.APPDATA || process.env.USERPROFILE || process.cwd();
