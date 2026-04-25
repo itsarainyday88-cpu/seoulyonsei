@@ -35,4 +35,12 @@ next-env.d.ts
 
 # electron build
 /release/
+/release-manual/
 /dist/
+
+# sensitive business config (SEOUL YONSEI)
+config.txt
+.env*
+*.bak
+public/generated-images/
+.thinking_history/
