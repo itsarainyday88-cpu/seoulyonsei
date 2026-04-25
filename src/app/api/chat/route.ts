@@ -30,6 +30,8 @@ export async function POST(req: Request) {
                         fullResponseBuffer += chunk; // Accumulate for review
                     }
 
+                    controller.close();
+
                     // --- Auto-Save Logic (Local MD file) ---
                     if (fullResponseBuffer.trim().length > 50) {
                         try {
@@ -40,41 +42,30 @@ export async function POST(req: Request) {
                             const fileName = `${agentId}_${dateStr}.md`;
                             fs.writeFileSync(path.join(outDir, fileName), fullResponseBuffer, 'utf8');
                             console.log(`[Auto-Save] Document saved to ${outDir}/${fileName}`);
-                        } catch (saveErr: any) {
-                            console.error('[Auto-Save] Error saving document:', saveErr.message);
-                        }
-                    }
 
-                    // --- Cloud Sync: Save to Supabase (Always or Lite) ---
-                    if (fullResponseBuffer.trim().length > 50) {
-                        try {
-                            const payload = {
-                                agent_id: String(agentId),
-                                content: fullResponseBuffer,
-                                created_at: new Date().toISOString()
-                            };
-                            console.log('[Cloud Sync] Attempting Supabase insert into [documents]...', { agent: payload.agent_id, length: payload.content.length });
-
+                            // --- Cloud Sync: Save to Supabase ---
                             try {
-                                const { data: syncResult, error: dbError } = await supabase
+                                const { error: dbError } = await supabase
                                     .from('documents')
-                                    .insert([payload])
-                                    .select();
+                                    .insert([{
+                                        agent_id: String(agentId),
+                                        content: fullResponseBuffer,
+                                        created_at: new Date().toISOString()
+                                    }]);
 
                                 if (dbError) {
-                                    console.error('[Cloud Sync] DB insert error (documents):', dbError.message, dbError.code, dbError.details);
+                                    console.error('[Cloud Sync] DB insert error (documents):', dbError);
                                 } else {
-                                    console.log(`[Cloud Sync] Document successfully synced to Supabase. ID: ${syncResult?.[0]?.id}`);
+                                    console.log(`[Cloud Sync] Document successfully synced to Supabase (agent: ${agentId})`);
                                 }
-                            } catch (syncErr: any) {
-                                console.error('[Cloud Sync] Supabase sync unexpected error:', syncErr.message);
+                            } catch (syncErr) {
+                                console.error('[Cloud Sync] Supabase sync unexpected error:', syncErr);
                             }
-                        } catch (cloudErr: any) {
-                            console.error('[Cloud Sync] Error preparing cloud sync:', cloudErr.message);
+
+                        } catch (saveErr) {
+                            console.error('[Auto-Save] Error saving document:', saveErr);
                         }
                     }
-
-                    controller.close();
                 } catch (error: any) {
                     console.error('Streaming Error:', error);
                     controller.error(error);

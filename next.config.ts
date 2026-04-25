@@ -1,10 +1,10 @@
 import type { NextConfig } from "next";
 
-const nextConfig: any = {
+const nextConfig: NextConfig = {
   // 'standalone' builds a self-contained server for Electron packaging
   output: "standalone",
   // Prevents Next.js from trying to bundle Electron's native modules
-  webpack: (config: any, { isServer }: { isServer: boolean }) => {
+  webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -19,12 +19,6 @@ const nextConfig: any = {
   },
   // Fix for Turbopack error when using custom webpack config:
   // We will use --webpack flag in scripts instead of configuring turbo here
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
 };
 
 export default nextConfig;

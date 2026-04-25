@@ -22,7 +22,7 @@ export async function retrieveStyleContext(query: string, matchCount = 3): Promi
         const result = await embeddingModel.embedContent(query);
         const queryEmbedding = result.embedding.values;
 
-        // 2. Supabase에서 RAG 전용 테이블(archive_posts) 기반 유사 문체 데이터 검색
+        // 2. Supabase에서 유사 문체 데이터 검색
         const { data: documents, error } = await supabase.rpc('match_documents', {
             query_embedding: queryEmbedding,
             match_threshold: 0.4, // 낮게 설정해 더 넓은 범위 매칭

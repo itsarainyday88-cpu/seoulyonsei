@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     try {
         const { email } = await request.json();
 
-        const allowedEmails = [process.env.GMAIL_USER, 'itsarainyday88@gmail.com'].filter(Boolean);
+        const allowedEmails = [process.env.GMAIL_USER, '[REDACTED_EMAIL]'].filter(Boolean);
         if (!allowedEmails.includes(email)) {
             return NextResponse.json({ error: 'Unauthorized email address' }, { status: 401 });
         }

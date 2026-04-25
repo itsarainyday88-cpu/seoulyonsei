@@ -6,7 +6,7 @@ import crypto from 'crypto';
  * Generates an image using Gemini Imagen 3 (Nano Banana Pro) via REST API.
  * Saves the image to public/generated-images and returns the public URL.
  */
-export async function generateAndSaveImage(prompt: string, excludedPaths: string[] = []): Promise<string | null> {
+export async function generateAndSaveImage(prompt: string): Promise<string | null> {
     const apiKey = process.env.GEMINI_API_KEY || process.env.IMAGEN_API_KEY;
     if (!apiKey) {
         console.error('GEMINI_API_KEY is missing');
@@ -17,36 +17,11 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
     // Clean up prompt (remove potential markdown artifacts if passed)
     let cleanPrompt = prompt.replace(/> \*\*Nano Banana Prompt:\*\*/g, '').trim();
 
-    // POLICY CHECK: Should we skip AI generation for real-world assets? (Tag must be present for check)
-    const { getImagePolicy } = await import('@/lib/image-policy');
-    const policy = getImagePolicy(cleanPrompt, excludedPaths);
+    // FORCE NEGATIVE PROMPT INJECTION (Software Level Override)
+    // 2. Basic Constraint: Korean/East Asian Only
+    const visuals = "Photographic style. High quality. NO TEXT. Subject: Korean, East Asian. ";
 
-    // CLEAN UP: Extract only the description string from [IMAGE_GENERATE: <description>] if it exists
-    const imageGenerateMatch = cleanPrompt.match(/\[IMAGE_GENERATE:\s*([^\]]+)\]/i);
-    if (imageGenerateMatch && imageGenerateMatch[1]) {
-        cleanPrompt = imageGenerateMatch[1].trim();
-    }
-
-    // [🚨 Coding-Level Text Blocking] 
-    // 프롬프트 내에 'text', 'korean text', 'letters' 등 텍스트 생성을 유도하는 키워드가 있으면 강제 삭제
-    cleanPrompt = cleanPrompt.replace(/(display(s)?\s+)?(the\s+)?(korean\s+)?text\s+(['"]?.*['"]?)/gi, '');
-    cleanPrompt = cleanPrompt.replace(/with\s+(a\s+)?(neon\s+)?sign\s+that\s+displays.*/gi, '');
-    cleanPrompt = cleanPrompt.replace(/text|letter|signage|word/gi, '');
-
-    // Also remove the standalone [FORCE_GENERATE] tag if it still exists
-    cleanPrompt = cleanPrompt.replace(/\[FORCE_GENERATE\]/gi, '').trim();
-
-    if (!policy.shouldGenerate) {
-        console.log(`[Policy] Skipping AI generation. Reason: ${policy.reason}`);
-        return policy.selectedImagePath || null;
-    }
-
-
-    // FORCE KOREAN CONTEXT INJECTION (Software Level Override)
-    // 에이전트가 깜빡해도 무조건 한국인, 한국 학원 배경이 나오도록 강제 주입
-    const visuals = "Photographic style. High quality. NO TEXT. Korean ethnicity people only. Modern Seoul Korean Academy (Hagwon) interior. Asian students with black hair. High-end Korean education environment. ";
-
-    const finalPrompt = visuals + cleanPrompt + " :: Do not include any text, signs, or watermarks. NO Western features, NO Caucasian, NO non-Asian, NO European style library.";
+    const finalPrompt = visuals + cleanPrompt + " :: Do not include any text, signs, or watermarks.";
 
     console.log(`[Imagen] Generating image for: "${finalPrompt.substring(0, 50)}..."`);
 
@@ -109,21 +84,31 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
     }
 
     try {
-        // [UPDATE] Prioritize Imagen 4 and specialized latest models
-        const modelOrder = [
-            'imagen-4.0-ultra-generate-001',
-            'imagen-4.0-generate-001',
-            'imagen-4.0-fast-generate-001',
-            'gemini-3-pro-image-preview',
-            'gemini-3.1-flash-image-preview',
-            'gemini-2.5-flash-image'
-        ];
+        // Attempt 1: Nano Banana Pro (Gemini 3 Pro Image) - Real ID
+        let base64Data = await callImagenApi(finalPrompt, 'gemini-3-pro-image-preview');
 
-        let base64Data = null;
-        for (const modelId of modelOrder) {
-            console.log(`[Imagen] Trying engine: ${modelId}...`);
-            base64Data = await callImagenApi(finalPrompt, modelId);
-            if (base64Data) break;
+        // Attempt 2: Nano Banana 2 (Gemini 3.1 Flash Image) - Real ID
+        if (!base64Data) {
+            console.log('[Imagen] Fallback to gemini-3.1-flash-image-preview...');
+            base64Data = await callImagenApi(finalPrompt, 'gemini-3.1-flash-image-preview');
+        }
+
+        // Attempt 3: Imagen 4.0 Generate (Standard)
+        if (!base64Data) {
+            console.log('[Imagen] Fallback to imagen-4.0-generate-001...');
+            base64Data = await callImagenApi(finalPrompt, 'imagen-4.0-generate-001');
+        }
+
+        // Attempt 4: Nano Banana (Gemini 2.5 Flash Image)
+        if (!base64Data) {
+            console.log('[Imagen] Fallback to gemini-2.5-flash-image...');
+            base64Data = await callImagenApi(finalPrompt, 'gemini-2.5-flash-image');
+        }
+
+        // Final Attempt: Imagen 3.0 (Old reliable fallback)
+        if (!base64Data) {
+            console.log('[Imagen] Fallback to imagen-3.0-generate-002...');
+            base64Data = await callImagenApi(finalPrompt, 'imagen-3.0-generate-002');
         }
 
         // If successful, save file
@@ -140,13 +125,11 @@ export async function generateAndSaveImage(prompt: string, excludedPaths: string
             console.log(`[Imagen] Saved to: ${filePath}`);
             return `/generated-images/${filename}`;
         } else {
-            console.log('[Imagen] All engines failed. Returning fallback from Policy Engine.');
-            const { getFallbackImage } = await import('@/lib/image-policy');
-            return getFallbackImage(cleanPrompt, excludedPaths);
+            console.log('[Imagen] All engines failed. Returning null → fallback image will be used.');
+            return null;
         }
     } catch (error: any) {
         console.error('[Imagen] Critical Error:', error.message);
-        const { getFallbackImage } = await import('@/lib/image-policy');
-        return getFallbackImage(cleanPrompt, excludedPaths);
+        return null;
     }
 }

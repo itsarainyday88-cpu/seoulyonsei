@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     // 1. 보안 체크: Vercel에서 보낸 요청인지 확인합니다.
     const authHeader = request.headers.get('authorization');
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return new Response('Unauthorized Access', { status: 401 });
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return new Response('Unauthorized', { status: 401 });
     }
 
     // 2. 슈파베이스 연결 (환경 변수 사용)
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
     try {
         // 3. DB에 간단한 신호를 보냅니다 (데이터 1개만 조회)
-        const { error } = await supabase.from('documents').select('id').limit(1);
+        const { error } = await supabase.from('yonsei_posts').select('id').limit(1);
 
         if (error) throw error;
 

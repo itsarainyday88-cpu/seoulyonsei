@@ -1,0 +1,15 @@
+﻿# ====================================================
+#  諛붾Ⅸ紐⑥뼇 留덉???OS - ?ㅼ젙 ?뚯씪
+#  硫붾え??Notepad)?쇰줈 ?섏젙?섏떊 ???깆쓣 ?ъ떆?묓븯?몄슂.
+# ====================================================
+
+# Gemini API ??(Google AI Studio?먯꽌 諛쒓툒)
+GEMINI_API_KEY=__SET_IN_ENV__
+
+# 濡쒓렇??怨꾩젙 ?뺣낫
+LOGIN_ID=__SET_IN_ENV__
+LOGIN_PASSWORD=__SET_IN_ENV__
+
+# ?대찓??(?뚮┝?? 蹂寃?遺덊븘??
+GMAIL_USER=__SET_IN_ENV__
+GMAIL_APP_PASSWORD=__SET_IN_ENV__
