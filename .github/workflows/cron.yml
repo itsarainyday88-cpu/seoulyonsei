@@ -1,0 +1,47 @@
+name: Scheduled Cron (Supabase Keep-Alive + Autopilot)
+
+on:
+  schedule:
+    # KST 09:00 daily — Supabase keep-alive
+    - cron: '0 0 * * *'
+    # KST 09:30 daily — Marketing autopilot
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Manual run target'
+        required: true
+        default: 'keep_alive'
+        type: choice
+        options:
+          - keep_alive
+          - autopilot
+
+jobs:
+  keep_alive:
+    if: github.event.schedule == '0 0 * * *' || github.event.inputs.target == 'keep_alive'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/cron/keep_alive
+        env:
+          BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail --show-error --silent \
+               --max-time 30 \
+               -H "Authorization: Bearer ${CRON_SECRET}" \
+               "${BASE_URL}/api/cron/keep_alive"
+
+  autopilot:
+    if: github.event.schedule == '30 0 * * *' || github.event.inputs.target == 'autopilot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron/autopilot
+        env:
+          BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail --show-error --silent \
+               --max-time 300 \
+               -H "Authorization: Bearer ${CRON_SECRET}" \
+               "${BASE_URL}/api/cron/autopilot"
